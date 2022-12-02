@@ -1,0 +1,544 @@
+/* body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  margin: auto;
+  max-width: 38rem;
+  padding: 2rem;
+} */
+
+* {
+  font-family: "ヒラギノ角ゴ ProN W3", HiraKakuProN-W3, 游ゴシック, "Yu Gothic",
+    メイリオ, Meiryo, Verdana, Helvetica, Arial, sans-serif !important;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  overflow: hidden;
+}
+
+html,
+body,
+#root,
+#main,
+.container {
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  max-width: none;
+}
+
+.row {
+  width: 100%;
+}
+
+.col {
+  height: 100%;
+  padding: 0;
+}
+
+div.oneRow {
+  height: 100%;
+  margin: 0;
+}
+
+.container,
+.col,
+.row {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#main {
+  width: 100%;
+  height: 100%;
+}
+
+#title {
+  height: calc(40px);
+  padding: 5px;
+  border-bottom: 2px solid #aaa;
+}
+#lawViewer {
+  height: calc(100% - 40px);
+}
+
+#TOC {
+  width: 100%;
+  height: 100%;
+  padding: 5px;
+  overflow-y: auto;
+}
+
+#TOC h4,
+#TOC h5,
+#TOC h6 {
+  margin: 10px 0 5px 0;
+}
+
+#fulltext {
+  width: 100%;
+  height: 100%;
+  padding: 5px;
+  overflow-y: auto;
+}
+
+.TOCArticleCaption {
+  font-size: smaller;
+}
+
+.article {
+  margin-left: 0.5em;
+  margin-bottom: 10px;
+}
+
+.articleTargeted {
+  background-color: #ddd;
+}
+
+.articleLabeled {
+  background-color: rgb(255, 194, 194);
+}
+
+.articlePaired {
+  background-color: rgb(220, 220, 255);
+}
+
+.article > div {
+  margin-left: 1.5em;
+}
+
+.articleCaption {
+  font-family: YuGothic, sans-serif;
+  font-weight: bold;
+  margin-left: -1em;
+}
+
+.articleCaption > .badge {
+  margin: 0 5px;
+}
+
+.articleTitle {
+  font-family: YuGothic, sans-serif;
+  font-weight: bold;
+  margin-left: -1em;
+  margin-right: 1em;
+  cursor: pointer;
+}
+
+.articleMenu {
+  position: "absolute";
+  margin: 0 !important;
+  padding: 1px;
+  color: "white";
+  border-radius: 3;
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  z-index: 9999999;
+}
+
+.articleMenu .col {
+  padding: 5px;
+  margin: 0 3px;
+  width: 120px;
+  cursor: pointer;
+}
+
+.paragraphNum {
+  margin-left: -1em;
+  margin-right: 1em;
+  font-family: YuGothic, sans-serif;
+  font-weight: bold;
+}
+
+.item {
+  margin-left: 1em;
+}
+
+.itemTitle {
+  margin-left: -1em;
+  margin-right: 1em;
+  font-family: YuGothic, sans-serif;
+  font-weight: bold;
+}
+
+.column {
+  margin-right: 1em;
+}
+
+.accordion-item {
+  /* padding: 0; */
+  margin-top: 10px;
+}
+
+.accordion-item button {
+  padding: 5px 15px;
+  /* margin: 0; */
+}
+
+.accordion-item pre {
+  white-space: pre-wrap;
+  margin-bottom: 0;
+}
+
+.TOCSection {
+  margin-left: 0.8em;
+}
+
+.TOCArticle {
+  margin-left: 0.5em;
+}
+
+.TOCArticle > div {
+  margin-left: 1.5em;
+}
+
+.TOCArticleTitle {
+  margin-left: -1em;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.TOCArticleCaption {
+  font-size: smaller;
+}
+
+.TOCArticleCaption > .badge {
+  margin: 0 2px;
+}
+
+.TOCArticleTargeted {
+  background-color: #ddd;
+}
+
+.TOCArticleLabeled {
+  background-color: rgb(255, 194, 194);
+}
+
+#textAnnotatorMenu {
+  height: 30px;
+  background-color: paleturquoise;
+}
+
+#textAnnotatorMain {
+  height: calc(100% - 30px);
+}
+
+#refInfo {
+  width: 100%;
+  height: 100%;
+}
+
+#targetedArticle {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+}
+
+#labeledArticle {
+  height: 100%;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #aaa;
+  width: 100%;
+  overflow-y: auto;
+}
+
+/* 以下、SAT関連 */
+
+#Menu ul {
+  display: inline-flex;
+  align-items: center;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#Menu li {
+  padding: 0px 2px;
+  margin: 0;
+  position: relative;
+  white-space: nowrap;
+}
+
+#Menu li.blank {
+  padding: 0px 10px;
+}
+
+#Menu li.switch {
+  width: 80px;
+}
+
+#Menu li input {
+  background-color: #f3f3f3;
+  border-radius: 5px;
+  padding: 2px 10px;
+}
+
+#Menu li img.icon {
+  height: 18px;
+  /* width: 18px; */
+  vertical-align: middle;
+  padding: 0px;
+  border-radius: 5px;
+}
+
+#Menu li img.icon_bottom {
+  height: 10px;
+  width: 10px;
+  vertical-align: bottom;
+  padding: 0px;
+  margin: 0px;
+}
+
+#Menu li img.icon:hover,
+#Menu li img.icon_bottom:hover {
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+#Menu li.hidden {
+  display: none;
+}
+
+/* https://qiita.com/dojyorin/items/6b2893b3e46597948a43 */
+#Menu li.switch input[type="checkbox"] {
+  display: none;
+}
+
+#Menu li.switch input[type="checkbox"] + label.check {
+  position: relative;
+  cursor: pointer;
+  display: inline-block;
+  width: 60px;
+  height: 18px;
+  margin-top: 8px;
+  color: #969696;
+  border: 1px solid #a3a3a3;
+  border-radius: 3px;
+  background-color: #ffffff;
+}
+
+#Menu li.switch input[type="checkbox"]:checked + label.check {
+  border: 1px solid #4db4e4;
+  background-color: #4db4e4;
+}
+
+#Menu li.switch input[type="checkbox"] + label.check::before {
+  position: absolute;
+  top: 2px;
+  left: auto;
+  right: 6px;
+}
+
+#Menu li.switch input[type="checkbox"]:checked + label.check::before {
+  position: absolute;
+  left: 6px;
+  right: auto;
+  color: #ffffff;
+}
+
+#Menu li.switch input[type="checkbox"] + label.check > div {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 16px;
+  border: 1px solid #a3a3a3;
+  border-radius: 3px;
+  background-color: #ffffff;
+  transition: 0.2s;
+}
+
+#Menu label {
+  border-radius: 2px;
+  padding: 2px;
+}
+
+#Menu li.switch input[type="checkbox"]:checked + label.check > div {
+  border: 1px solid transparent;
+  left: 44px;
+}
+
+li#word_menu {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #eee;
+  color: #111;
+  font-size: x-small;
+  height: 25px;
+  margin: 0;
+  padding: 0;
+}
+
+li#word_menu > div {
+  height: 100%;
+  border: #111 1px solid;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+}
+
+li#word_menu > div > * {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+li#li_zumen_analysis {
+  background-color: #eee;
+}
+
+input#word_inversion_lightness {
+  padding: 0;
+  margin: 0;
+  width: 70px;
+  vertical-align: middle;
+}
+
+#Menu li#word_menu > div {
+  text-align: center;
+}
+
+div#word_query {
+  border-radius: 3px;
+  padding: 2px 10px;
+  background-color: #f3f3f3;
+  color: #000;
+  min-width: 250px;
+  white-space: pre;
+}
+
+div#word_query:empty:before {
+  content: attr(placeholder);
+  pointer-events: none;
+  display: block;
+  /* For Firefox */
+  color: #888;
+}
+
+canvas.spectrum_bar {
+  background-color: black;
+  position: absolute;
+  top: 0%;
+  right: 0%;
+  opacity: 0.5;
+  z-index: 9999997;
+  width: 200px !important;
+}
+
+canvas.spectrum_bar:hover {
+  cursor: pointer;
+}
+
+.hide_spectrum_bar {
+  background-color: red;
+  position: absolute;
+  top: 0%;
+  right: 0%;
+  width: 30px;
+  height: 30px;
+  opacity: 0.5;
+  z-index: 9999998;
+  cursor: pointer;
+}
+
+/* スピナー ここから拝借 https://loading.io/css/*/
+#spinner {
+  transition: 0.1s;
+  display: flex;
+  visibility: hidden;
+  background: rgb(165, 255, 250);
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  z-index: 200;
+  justify-content: center;
+  align-items: center;
+  flex-flow: column;
+  text-align: center;
+}
+
+#spinner.visible {
+  opacity: 0.8;
+  visibility: visible;
+}
+
+#spinner_inside {
+  margin: auto;
+}
+
+.lds-ellipsis {
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.lds-ellipsis div {
+  position: absolute;
+  top: 33px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #000;
+  animation-timing-function: cubic-bezier(0, 1, 1, 0);
+}
+
+.lds-ellipsis div:nth-child(1) {
+  left: 8px;
+  animation: lds-ellipsis1 0.6s infinite;
+}
+
+.lds-ellipsis div:nth-child(2) {
+  left: 8px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+
+.lds-ellipsis div:nth-child(3) {
+  left: 32px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+
+.lds-ellipsis div:nth-child(4) {
+  left: 56px;
+  animation: lds-ellipsis3 0.6s infinite;
+}
+
+@keyframes lds-ellipsis1 {
+  0% {
+    transform: scale(0);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes lds-ellipsis3 {
+  0% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(0);
+  }
+}
+
+@keyframes lds-ellipsis2 {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  100% {
+    transform: translate(24px, 0);
+  }
+}
