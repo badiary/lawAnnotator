@@ -3,177 +3,95 @@ import Annotator from "./Annotator";
 import { kanji2number } from "@geolonia/japanese-numeral";
 import * as satModules from "./sat";
 
-export const LawContext = createContext({});
+// @ts-ignore
+export const GlobalDataContext = createContext<GlobalData>({});
 
 const lawProps: {
   [key: string]: {
     name: string;
     path: {
-      taiyaku: string;
-      chikujo: string;
-      label: string;
+      taiyaku?: string;
+      chikujo?: string;
+      ja?: string;
+      en?: string;
     };
   };
 } = {
   jpPatent: {
     name: "特許法",
     path: {
-      taiyaku: "../../extraResources/JP/taiyaku_patent.html",
-      chikujo: "../../extraResources/JP/chikujo_patent.txt",
-      label: "../../label/jpPatent/jpPatent.json",
+      taiyaku: "./resource/JP/taiyaku_patent.html",
+      chikujo: "./resource/JP/chikujo_patent.txt",
     },
   },
   jpUtil: {
     name: "実用新案法",
     path: {
-      taiyaku: "../../extraResources/JP/taiyaku_util.html",
-      chikujo: "../../extraResources/JP/chikujo_util.txt",
-      label: "../../label/jpUtil/jpUtil.json",
+      taiyaku: "./resource/JP/taiyaku_util.html",
+      chikujo: "./resource/JP/chikujo_util.txt",
+    },
+  },
+  epc: {
+    name: "欧州特許条約",
+    path: {
+      ja: "./resource/EP/epc_ja.html",
+      en: "./resource/EP/epc_html/whole.html",
     },
   },
 };
 
 function App() {
-  const [law, setLaw] = useState({});
-  const [selectedLaw, setSelectedLaw] = useState("jpPatent");
-  const [label, setLabel] = useState({});
-  const [loading, setLoading] = useState(true);
+  // @ts-ignore
+  const [globalData, setGlobalData] = useState<GlobalData>({
+    initialStates: {},
+    jpLaw: {},
+    sat: new satModules.Sat(),
+  });
+  const [selectedLaw, setSelectedLaw] = useState("epc");
+  const [initialStates, setInitialStates] = useState({});
+  const [loadingLaw, setLoadingLaw] = useState(true);
+  const [loadingInitialStates, setLoadingInitialStates] = useState(false);
 
   useEffect(() => {
-    async function readData() {
-      const result = await fetch("./resource/chikujo_patent.txt");
-      const data_chikujo = await result.text();
-      console.log(data_chikujo);
-
-      // const data_chikujo = await window.electronAPI.openFile(
-      //   lawProps[selectedLaw].path.chikujo,
-      //   { encoding: "utf-8" }
-      // );
-
-      // if (data_chikujo.error) {
-      //   console.log(data_chikujo.error);
-      //   alert("逐条解説データの読み込み失敗");
-      //   return;
-      // }
-
-      // 対訳HTMLをLawXMLの形式に落とし込む
-      const result2 = await fetch("./resource/taiyaku_patent.html");
-      const data_taiyaku = await result2.text();
-      // console.log(data_taiyaku);
-      // const data_taiyaku = await window.electronAPI.openFile(
-      //   lawProps[selectedLaw].path.taiyaku,
-      //   { encoding: "utf-8" }
-      // );
-      // if (data_taiyaku.error) {
-      //   console.log(data_taiyaku.error);
-      //   alert("対訳データの読み込み失敗");
-      //   return;
-      // }
-
-      const lawHTML = document.createElement("div");
-      lawHTML.innerHTML = data_taiyaku;
-
-      const taiyakuLaw: LawXML = {
-        $: {
-          Name: lawProps[selectedLaw].name,
-        },
-        LawBody: {
-          LawTitle: {
-            _: `${
-              (lawHTML.querySelector("span.LawTitle_text")! as HTMLElement)
-                .innerText
-            }`,
-          },
-          MainProvision: {
-            Chapter: Array.from(
-              lawHTML
-                .querySelector("div.MainProvision")!
-                .querySelectorAll("div.Chapter")
-            ).map((chapterEl, i) => {
-              return cleanChapter(chapterEl as HTMLElement, i);
-            }),
-          },
-        },
-        Article: {},
-        Chikujo: {},
-        sat: new satModules.Sat(),
-      };
-
-      const law: LawXML = taiyakuLaw;
-      // ここでarticle一覧を作ってしまう
-      law.Article = law.LawBody.MainProvision.Chapter.map(
-        (chapter: ChapterXML) => {
-          if (chapter.Section) {
-            return chapter.Section.map((section: SectionXML) => {
-              return section.Article;
-            });
-          } else if (chapter.Article) {
-            return [chapter.Article];
-          } else {
-            return [];
-          }
-        }
-      )
-        .flat(2)
-        .reduce(
-          (prev: { [articleNum: string]: ArticleXML }, cur: ArticleXML) => {
-            prev[cur.$.Num] = cur;
-            return prev;
-          },
-          {}
-        );
-
-      // 逐条解説のパース
-      const articleTitles = data_chikujo.match(
-        /^第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*/gm
-      )!;
-      const contents = data_chikujo
-        .split(
-          /^第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*[\r\n]*/gm
-        )!
-        .slice(1);
-      const chikujo_arr: {
-        [articleNum: string]: string;
-      } = articleTitles.reduce(
-        (
-          prev: {
-            [articleNum: string]: string;
-          },
-          cur: string,
-          idx: number
-        ) => {
-          const articleNum = cur
-            .match(/[〇一二三四五六七八九十百]+/g)!
-            .map(kanji2number)
-            .join("-");
-          prev[articleNum] = contents[idx].trim();
-          return prev;
-        },
-        {}
-      );
-
-      law.Chikujo = chikujo_arr;
-      console.log(law);
-
-      if (Object.keys(label).length) {
-        // @ts-ignore
-        law.initialState = label;
+    async function getLaw() {
+      for (const lawName of ["jpPatent", "jpUtil"]) {
+        newGlobalData.jpLaw[lawName] = await getJPLaw(lawName);
       }
-
-      setLoading(false);
-      setLaw(law);
-      console.log({ law });
+      newGlobalData.epc = await getEPLaw();
+      setGlobalData(newGlobalData);
+      console.log({ globalData });
+      setLoadingLaw(false);
     }
-    setLoading(true);
-    readData();
-    console.log({ selectedLaw });
-  }, [selectedLaw, label]);
+    const newGlobalData = { ...globalData };
+    setLoadingLaw(true);
+    getLaw();
+  }, []);
+
+  useEffect(() => {
+    setLoadingInitialStates(true);
+
+    const newGlobalData = { ...globalData };
+    newGlobalData.initialStates = initialStates;
+    setGlobalData(newGlobalData);
+
+    setLoadingInitialStates(false);
+  }, [initialStates]);
+
+  useEffect(() => {
+    setLoadingInitialStates(true);
+
+    // const newGlobalData = { ...globalData };
+    // newGlobalData.initialStates = initialStates;
+    // setGlobalData(newGlobalData);
+
+    setLoadingInitialStates(false);
+  }, [selectedLaw]);
 
   return (
     <>
-      {loading && <p>loading...</p>}
-      {!loading && (
-        <LawContext.Provider value={law}>
+      {(loadingLaw || loadingInitialStates) && <p>loading...</p>}
+      {!(loadingLaw || loadingInitialStates) && (
+        <GlobalDataContext.Provider value={globalData}>
           <div id="spinner">
             <div id="spinner_inside">
               <p id="loading_message"></p>
@@ -190,15 +108,165 @@ function App() {
             lawProps={lawProps}
             selectedLaw={selectedLaw}
             setSelectedLaw={setSelectedLaw}
-            setLabel={setLabel}
+            setInitialStates={setInitialStates}
           />
-        </LawContext.Provider>
+        </GlobalDataContext.Provider>
       )}
     </>
   );
 }
 
 export default App;
+
+const getJPLaw = async (lawName: string) => {
+  const result = await fetch(lawProps[lawName].path.chikujo!);
+  const data_chikujo = await result.text();
+
+  // 対訳HTMLをLawXMLの形式に落とし込む
+  const result2 = await fetch(lawProps[lawName].path.taiyaku!);
+  const data_taiyaku = await result2.text();
+
+  const lawHTML = document.createElement("div");
+  lawHTML.innerHTML = data_taiyaku;
+
+  const taiyakuLaw: JPLawXML = {
+    $: {
+      Name: lawProps[lawName].name,
+    },
+    LawBody: {
+      LawTitle: {
+        _: `${
+          (lawHTML.querySelector("span.LawTitle_text")! as HTMLElement)
+            .innerText
+        }`,
+      },
+      MainProvision: {
+        Chapter: Array.from(
+          lawHTML
+            .querySelector("div.MainProvision")!
+            .querySelectorAll("div.Chapter")
+        ).map((chapterEl, i) => {
+          return cleanChapter(chapterEl as HTMLElement, i);
+        }),
+      },
+    },
+    Article: {},
+    Chikujo: {},
+  };
+
+  const law: JPLawXML = taiyakuLaw;
+  // ここでarticle一覧を作ってしまう
+  law.Article = law.LawBody.MainProvision.Chapter.map((chapter: ChapterXML) => {
+    if (chapter.Section) {
+      return chapter.Section.map((section: SectionXML) => {
+        return section.Article;
+      });
+    } else if (chapter.Article) {
+      return [chapter.Article];
+    } else {
+      return [];
+    }
+  })
+    .flat(2)
+    .reduce((prev: { [articleNum: string]: ArticleXML }, cur: ArticleXML) => {
+      prev[cur.$.Num] = cur;
+      return prev;
+    }, {});
+
+  // 逐条解説のパース
+  const articleTitles = data_chikujo.match(
+    /^第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*/gm
+  )!;
+  const contents = data_chikujo
+    .split(
+      /^第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*[\r\n]*/gm
+    )!
+    .slice(1);
+  const chikujo_arr: {
+    [articleNum: string]: string;
+  } = articleTitles.reduce(
+    (
+      prev: {
+        [articleNum: string]: string;
+      },
+      cur: string,
+      idx: number
+    ) => {
+      const articleNum = cur
+        .match(/[〇一二三四五六七八九十百]+/g)!
+        .map(kanji2number)
+        .join("-");
+      prev[articleNum] = contents[idx].trim();
+      return prev;
+    },
+    {}
+  );
+
+  law.Chikujo = chikujo_arr;
+  return law;
+};
+
+const getEPLaw = async () => {
+  // ja
+  const result_ja = await fetch(lawProps["epc"].path.ja!);
+  const epc_ja = await result_ja.text();
+  const articleTitles = epc_ja.match(/^第[0-9a-z]+条 [^\r\n]+/gm)!;
+  const contents = epc_ja.split(/^第[0-9a-z]+条 [^\r\n]+/gm)!.slice(1);
+  const ja: {
+    [articleNum: string]: { title: string; content: string };
+  } = articleTitles.reduce(
+    (
+      prev: {
+        [articleNum: string]: { title: string; content: string };
+      },
+      cur: string,
+      idx: number
+    ) => {
+      const articleNum = cur.match(/[0-9a-z]+/g)![0];
+      prev[articleNum] = {
+        title: articleTitles[idx],
+        content: contents[idx].trim(),
+      };
+      return prev;
+    },
+    {}
+  );
+
+  // en
+
+  const result_en = await fetch(lawProps["epc"].path.en!);
+  const epc_html = document.createElement("div");
+  epc_html.innerHTML = await result_en.text();
+  const en = Array.from(epc_html.querySelectorAll(".pagebody")).map((art) => {
+    let [artTitle, artCaption] = (
+      art.querySelector("p.LMArtReg")! as HTMLElement
+    ).innerHTML
+      .trim()
+      .split("<br>");
+    const articleNum = artTitle.split("&nbsp;")[1].split("<")[0];
+    artCaption = artCaption.replace("\n", "").replace(/\s+/g, " ");
+
+    // 以下、content
+    let content = "";
+    if (art.querySelector("div.LMNormal")) {
+      // 箇条書きがない条文の場合
+      content = (art.querySelector("div.LMNormal")! as HTMLElement).innerText;
+    }
+    if (art.querySelector("div.DOC4NET2_LMNormal_spc")) {
+      // 箇条書きの条文の場合
+      content = Array.from(art.querySelectorAll("div.DOC4NET2_LMNormal_spc"))
+        .map((block) => {
+          return (block as HTMLElement).innerText;
+        })
+        .join("\n");
+    }
+
+    return { articleNum, artCaption, content };
+  });
+
+  console.log(en);
+  return { en: en, ja: ja };
+};
 
 // 以下、対訳HTMLのパース用関数
 const cleanChapter = (chapterEl: HTMLElement, index: number): ChapterXML => {

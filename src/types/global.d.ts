@@ -1,12 +1,23 @@
-import { electronAPI } from "../preload";
 import { Sat } from "../Annotator/sat";
 declare global {
-  type LawXML = {
+  type GlobalData = {
+    initialStates: { [lawName: string]: InitialState };
+    sat?: Sat;
+    jpLaw: { [lawName: string]: JPLawXML };
+    epc: EPLawXML;
+  };
+  type InitialState = {
+    relation: { [articleNum: string]: string[] };
+    textLabel: {
+      [articleNumPair: string]: { [sentenceID: string]: TextLabel[] };
+    };
+    targetedArticleNum?: string;
+    pairedArticleNum?: string;
+    textHighlighterOption: TextHighlighterOption;
+  };
+
+  type JPLawXML = {
     $: {
-      // Era: string;
-      // Year: string;
-      // PromulgateMonth: string;
-      // PromulgateDay: string;
       Name: string;
     };
     LawBody: {
@@ -23,16 +34,6 @@ declare global {
     Chikujo: {
       [articleNum: string]: string;
     };
-    initialState?: {
-      relation: { [articleNum: string]: string[] };
-      textLabel: {
-        [articleNumPair: string]: { [sentenceID: string]: TextLabel[] };
-      };
-      targetedArticleNum?: string;
-      pairedArticleNum?: string;
-      textHighlighterOption?: TextHighlighterOption;
-    };
-    sat: Sat;
   };
 
   type ChapterXML = {
@@ -93,6 +94,13 @@ declare global {
   type ColumnXML = {
     $: { Num: string };
     Sentence: SentenceXML[] | SentenceXML;
+  };
+
+  type EPLawXML = {
+    en: any;
+    ja: {
+      [articleNum: string]: { title: string; content: string };
+    };
   };
 
   type TextLabelUnit = {

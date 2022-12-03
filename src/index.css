@@ -542,3 +542,15 @@ canvas.spectrum_bar:hover {
     transform: translate(24px, 0);
   }
 }
+
+dl.epc div {
+  display: flex;
+  justify-content: flex-start;
+}
+dl.epc div dt {
+  min-width: 2em;
+  font-weight: normal;
+}
+dl.epc div dd {
+  margin: 0;
+}

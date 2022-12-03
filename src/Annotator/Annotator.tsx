@@ -1,18 +1,17 @@
 import React, {
-  createContext,
   useContext,
   useReducer,
   useRef,
   useEffect,
   useState,
 } from "react";
-import { LawContext } from "./App";
-import TextAnnotator from "./TextAnnotator";
+import { GlobalDataContext } from "./App";
+import JPTextAnnotator from "./JPTextAnnotator";
 import { Container, Row, Col } from "react-bootstrap";
 import Button from "react-bootstrap/Button";
 import ButtonGroup from "react-bootstrap/ButtonGroup";
-import TOC from "./TOC";
-import FullText from "./FullText";
+import JPFullText from "./JPFullText";
+import EPFullText from "./EPFullText";
 import Menu from "./Menu";
 import hotkeys from "hotkeys-js";
 import { kanji2number } from "@geolonia/japanese-numeral";
@@ -22,26 +21,30 @@ type AnnotatorProps = {
     [key: string]: {
       name: string;
       path: {
-        taiyaku: string;
-        chikujo: string;
-        label: string;
+        taiyaku?: string;
+        chikujo?: string;
+        ja?: string;
+        en?: string;
       };
     };
   };
   selectedLaw: string;
   setSelectedLaw: React.Dispatch<React.SetStateAction<string>>;
-  setLabel: any;
+  setInitialStates: React.Dispatch<
+    React.SetStateAction<{ [lawName: string]: InitialState }>
+  >;
 };
 function Annotator(props: AnnotatorProps) {
-  console.log("rendering Annotator");
-  const law = useContext(LawContext) as LawXML;
+  console.log("rendering Annotator", props.selectedLaw);
+  const globalData = useContext<GlobalData>(GlobalDataContext);
   let initialtextHighlighterOption: TextHighlighterOption = {
     words: [],
     className: {},
     query: "",
   };
-  if (law.initialState?.textHighlighterOption) {
-    initialtextHighlighterOption = law.initialState.textHighlighterOption;
+  if (globalData.initialStates[props.selectedLaw]?.textHighlighterOption) {
+    initialtextHighlighterOption =
+      globalData.initialStates[props.selectedLaw]!.textHighlighterOption;
   }
   const [textHighlighterOption, setTextHighlighterOption] = useState(
     initialtextHighlighterOption
@@ -49,10 +52,12 @@ function Annotator(props: AnnotatorProps) {
 
   // 初期のラベルデータをセット
   let initialAnnotatorState: AnnotatorState;
-  let initialRelation: { [articleNum: string]: Set<string> };
-  if (law.initialState) {
+  let initialRelation: { [articleNum: string]: Set<string> } = {};
+  if (globalData.initialStates[props.selectedLaw]) {
     // relationの中のarrayをsetに変換
-    initialRelation = Object.entries(law.initialState.relation).reduce(
+    initialRelation = Object.entries(
+      globalData.initialStates[props.selectedLaw].relation
+    ).reduce(
       (
         prev: { [articleNum: string]: Set<string> },
         [articleNum, relatedArticleNums]
@@ -63,16 +68,21 @@ function Annotator(props: AnnotatorProps) {
       {}
     );
 
-    const { relation, ...otherStates } = law.initialState;
+    const { relation, ...otherStates } =
+      globalData.initialStates[props.selectedLaw];
     initialAnnotatorState = { relation: initialRelation, ...otherStates };
   } else {
-    initialRelation = Object.keys(law.Article).reduce(
-      (prev: { [articleNum: string]: Set<string> }, cur: string) => {
+    if (props.selectedLaw === "jpPatent" || props.selectedLaw === "jpUtil") {
+      initialRelation = Object.keys(
+        globalData.jpLaw[props.selectedLaw].Article
+      ).reduce((prev: { [articleNum: string]: Set<string> }, cur: string) => {
         prev[cur] = new Set<string>();
         return prev;
-      },
-      {}
-    );
+      }, {});
+    } else {
+      // TODO! epcの場合のinitialRelationの作成
+    }
+
     initialAnnotatorState = {
       relation: initialRelation,
       textLabel: {},
@@ -205,7 +215,6 @@ function Annotator(props: AnnotatorProps) {
     }
   }
 
-  const TOCEl = useRef<HTMLDivElement>(null);
   const fulltextEl = useRef<HTMLDivElement>(null);
   const targetedArticleEl = useRef<HTMLDivElement>(null);
   const labeledArticleEl = useRef<HTMLDivElement>(null);
@@ -214,18 +223,17 @@ function Annotator(props: AnnotatorProps) {
     labeledArticleEl,
   });
   useEffect(() => {
-    law.sat.initialize(
+    globalData.sat!.initialize(
       [
-        // [TOCEl.current!, "hidden"],
         [fulltextEl.current!, "visible"],
-        [targetedArticleEl.current!, "hidden"],
-        [labeledArticleEl.current!, "hidden"],
+        // [targetedArticleEl.current!, "hidden"],
+        // [labeledArticleEl.current!, "hidden"],
       ],
       0.5,
       true,
       false
     );
-    law.sat.cv!.draw();
+    globalData.sat!.cv!.draw();
 
     hotkeys("command+shift+f", (event: Event, _handler: any) => {
       event.preventDefault();
@@ -291,9 +299,9 @@ function Annotator(props: AnnotatorProps) {
   };
 
   useEffect(() => {
-    if (law.sat.cv) {
-      law.sat.cv.updateData();
-      law.sat.cv.draw();
+    if (globalData.sat!.cv) {
+      globalData.sat!.cv.updateData();
+      globalData.sat!.cv.draw();
     } else {
       alert("no sat cv");
     }
@@ -303,49 +311,95 @@ function Annotator(props: AnnotatorProps) {
   return (
     <Container id="main">
       <Row id="title">
-        <Menu
-          setLabel={props.setLabel}
-          saveLabel={saveLabel}
-          setTextHighlighterOption={setTextHighlighterOption}
-          textHighlighterOption={textHighlighterOption}
-        ></Menu>
+        <Col>
+          <h4>
+            <ButtonGroup aria-label="Basic example">
+              {Object.entries(props.lawProps).map(([key, val]) => {
+                if (key === props.selectedLaw) {
+                  return (
+                    <Button key={key} variant="primary">
+                      {val.name}
+                    </Button>
+                  );
+                } else {
+                  return (
+                    <Button
+                      key={key}
+                      data-key={key}
+                      variant="light"
+                      onClick={(e) => {
+                        const clickedKey = (
+                          e.target as HTMLButtonElement
+                        ).attributes.getNamedItem("data-key")!.value;
+                        props.setSelectedLaw(clickedKey);
+                      }}
+                    >
+                      {val.name}
+                    </Button>
+                  );
+                }
+              })}
+            </ButtonGroup>
+          </h4>
+        </Col>
+        <Col>
+          <Menu
+            setInitialStates={props.setInitialStates}
+            saveLabel={saveLabel}
+            setTextHighlighterOption={setTextHighlighterOption}
+            textHighlighterOption={textHighlighterOption}
+          ></Menu>
+        </Col>
       </Row>
       <Row id="lawViewer">
         <Container>
           <Row className="oneRow">
-            {/* <Col className="col-4" style={{ maxWidth: "300px" }} ref={TOCEl}>
-              <TOC
-                targetedArticleNum={annotatorState.targetedArticleNum}
-                relation={
-                  annotatorState.targetedArticleNum
-                    ? annotatorState.relation[annotatorState.targetedArticleNum]
-                    : new Set<string>()
-                }
-                textHighlighterOption={textHighlighterOption}
-              ></TOC>
-            </Col> */}
             <Col className="col-6" ref={fulltextEl}>
-              <FullText
-                targetedArticleNum={annotatorState.targetedArticleNum}
-                relation={
-                  annotatorState.targetedArticleNum
-                    ? annotatorState.relation[annotatorState.targetedArticleNum]
-                    : new Set<string>()
-                }
-                dispatch={dispatch}
-                textHighlighterOption={textHighlighterOption}
-              ></FullText>
+              {(props.selectedLaw === "jpPatent" ||
+                props.selectedLaw === "jpUtil") && (
+                <JPFullText
+                  selectedLaw={props.selectedLaw}
+                  targetedArticleNum={annotatorState.targetedArticleNum}
+                  relation={
+                    annotatorState.targetedArticleNum
+                      ? annotatorState.relation[
+                          annotatorState.targetedArticleNum
+                        ]
+                      : new Set<string>()
+                  }
+                  dispatch={dispatch}
+                  textHighlighterOption={textHighlighterOption}
+                />
+              )}
+              {props.selectedLaw === "epc" && (
+                <EPFullText
+                  targetedArticleNum={annotatorState.targetedArticleNum}
+                  relation={
+                    annotatorState.targetedArticleNum
+                      ? annotatorState.relation[
+                          annotatorState.targetedArticleNum
+                        ]
+                      : new Set<string>()
+                  }
+                  dispatch={dispatch}
+                  textHighlighterOption={textHighlighterOption}
+                />
+              )}
             </Col>
             <Col>
-              <TextAnnotator
-                targetedArticleNum={annotatorState.targetedArticleNum}
-                pairedArticleNum={annotatorState.pairedArticleNum}
-                relation={annotatorState.relation}
-                textLabel={annotatorState.textLabel}
-                dispatch={dispatch}
-                textHighlighterOption={textHighlighterOption}
-                ref={textAnnotatorEls}
-              />
+              {(props.selectedLaw === "jpPatent" ||
+                props.selectedLaw === "jpUtil") && (
+                <JPTextAnnotator
+                  selectedLaw={props.selectedLaw}
+                  targetedArticleNum={annotatorState.targetedArticleNum}
+                  pairedArticleNum={annotatorState.pairedArticleNum}
+                  relation={annotatorState.relation}
+                  textLabel={annotatorState.textLabel}
+                  dispatch={dispatch}
+                  textHighlighterOption={textHighlighterOption}
+                  ref={textAnnotatorEls}
+                />
+              )}
             </Col>
           </Row>
         </Container>
@@ -375,7 +429,6 @@ type TextToHighlighterProps = {
   textHighlighterOption: TextHighlighterOption;
 };
 export const TextHighlighter = (props: TextToHighlighterProps) => {
-  // 自力で書きたい
   const chunks: { text: string; className: string }[] =
     props.textHighlighterOption.words.reduce(
       // 反転ワード毎にループ
