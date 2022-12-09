@@ -255,63 +255,6 @@ class SatWord {
       "((?:第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*(?:第[〇一二三四五六七八九十百]項)?(?:第[〇一二三四五六七八九十百]号)?)|(?:前[条項号](?:第[〇一二三四五六七八九十百][項号])*))";
     this.textHighlighterOption.words.unshift(articleWord);
     this.textHighlighterOption.className[articleWord] = "articleWord";
-
-    // this.textHighlighterOption.highlightFunc = ({
-    //   children,
-    // }: {
-    //   children: string;
-    // }) => {
-    //   // 正規表現に対応させつつ、条文のリンクにも対応
-
-    //   const className = this.textHighlighterOption.className[children];
-    //   if (className) {
-    //     return (
-    //       <span className={`${className} word_inversion`}>{children}</span>
-    //     );
-    //   } else {
-    //     // 条文のパターンに一致する場合
-    //     if (new RegExp(this.textHighlighterOption.words[0]).test(children)) {
-    //       return (
-    //         <a
-    //           href="#1"
-    //           onClick={(e) => {
-    //             const articleTerm = children.match(
-    //               /第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*/
-    //             );
-    //             if (articleTerm) {
-    //               document
-    //                 .getElementById(
-    //                   `article${articleTerm[0]
-    //                     .match(/[〇一二三四五六七八九十百]+/g)!
-    //                     .map(kanji2number)
-    //                     .join("_")}`
-    //                 )
-    //                 ?.scrollIntoView();
-    //             }
-    //           }}
-    //         >
-    //           {children}
-    //         </a>
-    //       );
-
-    //       // return <mark>{children}</mark>; // TODO aタグに変更する
-    //     } else {
-    //       let className = "";
-    //       for (let i = 1; i < this.textHighlighterOption.words.length; i++) {
-    //         const word = this.textHighlighterOption.words[i];
-
-    //         if (new RegExp(word).test(children)) {
-    //           className = this.textHighlighterOption.className[`/${word}/`];
-    //           // console.log({ word, children, className });
-    //           break;
-    //         }
-    //       }
-    //       return (
-    //         <span className={`${className} word_inversion`}>{children}</span>
-    //       );
-    //     }
-    //   }
-    // };
   };
 
   setColor = (color_id: number, color: string): void => {
@@ -390,6 +333,7 @@ class SatCanvas {
       });
 
       cv.onclick = (e: any) => {
+        console.log("click cv");
         scroll_div.scrollTo(
           0,
           e.layerY * (scroll_div.scrollHeight / cv.height) - cv.height / 2

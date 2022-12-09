@@ -1,19 +1,18 @@
 import { Sat } from "../Annotator/sat";
 declare global {
-  type GlobalData = {
-    initialStates: { [lawName: string]: InitialState };
-    sat?: Sat;
-    jpLaw: { [lawName: string]: JPLawXML };
-    epc: EPLawXML;
-  };
-  type InitialState = {
-    relation: { [articleNum: string]: string[] };
-    textLabel: {
-      [articleNumPair: string]: { [sentenceID: string]: TextLabel[] };
+  type Law = {
+    info: {
+      [key: string]: {
+        name: string;
+        path: {
+          taiyaku?: string;
+          chikujo?: string;
+          ja?: string;
+          en?: string;
+        };
+      };
     };
-    targetedArticleNum?: string;
-    pairedArticleNum?: string;
-    textHighlighterOption: TextHighlighterOption;
+    content: { [lawName: string]: JPLawXML | EPLawXML };
   };
 
   type JPLawXML = {
@@ -97,7 +96,20 @@ declare global {
   };
 
   type EPLawXML = {
-    en: any;
+    en: {
+      articleObj: {
+        [articleNum: string]: {
+          articleNum: string;
+          articleCaption: string;
+          content: string;
+        };
+      };
+      articleArr: {
+        articleNum: string;
+        articleCaption: string;
+        content: string;
+      }[];
+    };
     ja: {
       [articleNum: string]: { title: string; content: string };
     };
@@ -110,23 +122,25 @@ declare global {
     text: string;
   };
 
-  type AnnotatorState = {
+  type LawState = {
     relation: { [articleNum: string]: Set<string> };
     textLabel: {
       [articleNumPair: string]: { [sentenceID: string]: TextLabel[] };
     };
     targetedArticleNum?: string;
     pairedArticleNum?: string;
-    textHighlighterOption?: TextHighlighterOption;
   };
+
   type DispatchAction = {
-    type: "update" | "target" | "addArticle" | "deleteArticle" | "text";
-    annotatorState?: AnnotatorState;
-    articleNum: string;
+    type: "load" | "target" | "addArticle" | "deleteArticle" | "text";
+    lawState?: LawState;
+    selectedLaw?: string;
+    articleNum?: string;
     text?: {
       sentenceID: string;
       textLabels: TextLabel[];
     };
+    json?: string;
   };
 
   type TextHighlighterOption = {
@@ -136,11 +150,5 @@ declare global {
   };
 
   type ArticleStatus = "none" | "target" | "labeled";
-  type LabelName =
-    | "definition"
-    | "defined"
-    | "reference"
-    | "referred"
-    | "overwriting"
-    | "overwritten";
+  type LabelName = "definition" | "defined" | "overwriting" | "overwritten";
 }

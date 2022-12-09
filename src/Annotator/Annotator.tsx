@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { GlobalDataContext } from "./App";
+import { LawContext } from "./App";
 import JPTextAnnotator from "./JPTextAnnotator";
 import { Container, Row, Col } from "react-bootstrap";
 import Button from "react-bootstrap/Button";
@@ -15,203 +15,180 @@ import EPFullText from "./EPFullText";
 import Menu from "./Menu";
 import hotkeys from "hotkeys-js";
 import { kanji2number } from "@geolonia/japanese-numeral";
+import * as satModules from "./sat";
+import EPTextAnnotator from "./EPTextAnnotator";
 
 type AnnotatorProps = {
-  lawProps: {
-    [key: string]: {
-      name: string;
-      path: {
-        taiyaku?: string;
-        chikujo?: string;
-        ja?: string;
-        en?: string;
-      };
-    };
-  };
-  selectedLaw: string;
-  setSelectedLaw: React.Dispatch<React.SetStateAction<string>>;
-  setInitialStates: React.Dispatch<
-    React.SetStateAction<{ [lawName: string]: InitialState }>
-  >;
+  sat: satModules.Sat;
 };
 function Annotator(props: AnnotatorProps) {
-  console.log("rendering Annotator", props.selectedLaw);
-  const globalData = useContext<GlobalData>(GlobalDataContext);
-  let initialtextHighlighterOption: TextHighlighterOption = {
-    words: [],
-    className: {},
-    query: "",
-  };
-  if (globalData.initialStates[props.selectedLaw]?.textHighlighterOption) {
-    initialtextHighlighterOption =
-      globalData.initialStates[props.selectedLaw]!.textHighlighterOption;
-  }
-  const [textHighlighterOption, setTextHighlighterOption] = useState(
-    initialtextHighlighterOption
-  );
+  console.log("rendering Annotator");
+  const law = useContext<Law>(LawContext);
 
-  // 初期のラベルデータをセット
-  let initialAnnotatorState: AnnotatorState;
-  let initialRelation: { [articleNum: string]: Set<string> } = {};
-  if (globalData.initialStates[props.selectedLaw]) {
-    // relationの中のarrayをsetに変換
-    initialRelation = Object.entries(
-      globalData.initialStates[props.selectedLaw].relation
-    ).reduce(
-      (
-        prev: { [articleNum: string]: Set<string> },
-        [articleNum, relatedArticleNums]
-      ) => {
-        prev[articleNum] = new Set<string>(relatedArticleNums);
-        return prev;
-      },
-      {}
-    );
+  const [textHighlighterOption, setTextHighlighterOption] =
+    useState<TextHighlighterOption>({
+      words: [],
+      className: {},
+      query: "",
+    });
 
-    const { relation, ...otherStates } =
-      globalData.initialStates[props.selectedLaw];
-    initialAnnotatorState = { relation: initialRelation, ...otherStates };
-  } else {
-    if (props.selectedLaw === "jpPatent" || props.selectedLaw === "jpUtil") {
-      initialRelation = Object.keys(
-        globalData.jpLaw[props.selectedLaw].Article
-      ).reduce((prev: { [articleNum: string]: Set<string> }, cur: string) => {
-        prev[cur] = new Set<string>();
-        return prev;
-      }, {});
-    } else {
-      // TODO! epcの場合のinitialRelationの作成
-    }
-
-    initialAnnotatorState = {
-      relation: initialRelation,
-      textLabel: {},
-    };
-  }
-
-  const [annotatorState, dispatch] = useReducer(reducer, initialAnnotatorState);
+  const [lawStates, dispatch] = useReducer(reducer, getInitialLawStates(law));
+  const [selectedLaw, setSelectedLaw] = useState("jpPatent");
 
   function reducer(
-    annotatorState: AnnotatorState,
+    lawStates: { [lawName: string]: LawState },
     action: DispatchAction
-  ): AnnotatorState {
-    console.log("action", { action, annotatorState });
+  ): { [lawName: string]: LawState } {
+    console.log("action", { action, lawStates });
     // 再レンダリングを意識してオブジェクトを作り変えるのを忘れない！
-    const newAnnotatorState: AnnotatorState = { ...annotatorState };
+    const newLawStates: { [lawName: string]: LawState } = { ...lawStates };
 
     switch (action.type) {
-      case "update":
-        return { ...action.annotatorState! };
+      case "load":
+        const data = JSON.parse(action.json!);
+        Object.entries(data.lawStates).forEach(([lawName, lawState]) => {
+          // @ts-ignore
+          Object.entries(lawState.relation).forEach(
+            ([articleNum, articleNumArr]) => {
+              // @ts-ignore
+              lawState.relation[articleNum] = new Set<string>(articleNumArr);
+            }
+          );
+        });
+        // @ts-ignore
+        return data.lawStates;
+
       case "target":
-        if (annotatorState.targetedArticleNum === action.articleNum) {
-          return annotatorState;
+        if (!action.selectedLaw) return lawStates;
+        if (
+          lawStates[action.selectedLaw].targetedArticleNum === action.articleNum
+        ) {
+          return lawStates;
         }
-        newAnnotatorState.targetedArticleNum = action.articleNum;
-        newAnnotatorState.pairedArticleNum = undefined;
-        return newAnnotatorState;
+
+        newLawStates[action.selectedLaw].targetedArticleNum = action.articleNum;
+        newLawStates[action.selectedLaw].pairedArticleNum = undefined;
+        return newLawStates;
 
       case "addArticle":
       case "deleteArticle": {
-        if (!annotatorState.targetedArticleNum) {
+        if (!action.selectedLaw) return lawStates;
+        if (!lawStates[action.selectedLaw].targetedArticleNum) {
           alert("Select an article to target first.");
-          return annotatorState;
+          return lawStates;
         }
-        if (annotatorState.targetedArticleNum === action.articleNum) {
+        if (
+          lawStates[action.selectedLaw].targetedArticleNum === action.articleNum
+        ) {
           alert("Cannot add / delete the targeted article itself.");
-          return annotatorState;
+          return lawStates;
         }
 
         if (action.type === "addArticle") {
-          newAnnotatorState.relation[annotatorState.targetedArticleNum].add(
-            action.articleNum
+          newLawStates[action.selectedLaw].relation[
+            lawStates[action.selectedLaw].targetedArticleNum!
+          ].add(action.articleNum!);
+          newLawStates[action.selectedLaw].relation[action.articleNum!].add(
+            lawStates[action.selectedLaw].targetedArticleNum!
           );
-          newAnnotatorState.relation[action.articleNum].add(
-            annotatorState.targetedArticleNum
-          );
-          newAnnotatorState.pairedArticleNum = action.articleNum;
+          newLawStates[action.selectedLaw].pairedArticleNum = action.articleNum;
         } else if (action.type === "deleteArticle") {
-          newAnnotatorState.relation[annotatorState.targetedArticleNum].delete(
-            action.articleNum
-          );
-          newAnnotatorState.relation[action.articleNum].delete(
-            annotatorState.targetedArticleNum
+          newLawStates[action.selectedLaw].relation[
+            lawStates[action.selectedLaw].targetedArticleNum!
+          ].delete(action.articleNum!);
+          newLawStates[action.selectedLaw].relation[action.articleNum!].delete(
+            lawStates[action.selectedLaw].targetedArticleNum!
           );
           const articleNumPair = [
             action.articleNum,
-            annotatorState.targetedArticleNum,
+            lawStates[action.selectedLaw].targetedArticleNum,
           ]
             .sort()
             .join(",");
-          newAnnotatorState.textLabel[articleNumPair] = {};
-          if (action.articleNum === annotatorState.pairedArticleNum) {
-            newAnnotatorState.pairedArticleNum = undefined;
+          newLawStates[action.selectedLaw].textLabel[articleNumPair] = {};
+          if (
+            action.articleNum === lawStates[action.selectedLaw].pairedArticleNum
+          ) {
+            newLawStates[action.selectedLaw].pairedArticleNum = undefined;
           }
         }
 
         // 再レンダリング処理
-        newAnnotatorState.relation = { ...newAnnotatorState.relation };
+        newLawStates[action.selectedLaw].relation = {
+          ...newLawStates[action.selectedLaw].relation,
+        };
 
-        return newAnnotatorState;
+        return newLawStates;
       }
 
       case "text": {
-        if (!action.text) {
-          return annotatorState;
-        }
-        if (!annotatorState.targetedArticleNum) {
+        if (!action.selectedLaw) return lawStates;
+        if (!action.text) return lawStates;
+
+        if (!lawStates[action.selectedLaw].targetedArticleNum) {
           alert("Select targeted article.");
-          return annotatorState;
+          return lawStates;
         }
 
         console.log(action.text);
 
         let articleNumPair: string;
-        if (action.articleNum !== annotatorState.targetedArticleNum) {
+        if (
+          action.articleNum !== lawStates[action.selectedLaw].targetedArticleNum
+        ) {
           // labeled articleのアノテーションの場合
 
           // pairedArticleNumが違っていたら更新して終わり
-          if (action.articleNum !== newAnnotatorState.pairedArticleNum) {
-            newAnnotatorState.pairedArticleNum = action.articleNum;
-            return newAnnotatorState;
+          if (
+            action.articleNum !==
+            newLawStates[action.selectedLaw].pairedArticleNum
+          ) {
+            newLawStates[action.selectedLaw].pairedArticleNum =
+              action.articleNum;
+            return newLawStates;
           }
 
           articleNumPair = [
             action.articleNum,
-            annotatorState.targetedArticleNum,
+            lawStates[action.selectedLaw].targetedArticleNum,
           ]
             .sort()
             .join(",");
         } else if (
-          annotatorState.pairedArticleNum &&
-          annotatorState.pairedArticleNum !== annotatorState.targetedArticleNum
+          lawStates[action.selectedLaw].pairedArticleNum &&
+          lawStates[action.selectedLaw].pairedArticleNum !==
+            lawStates[action.selectedLaw].targetedArticleNum
         ) {
           // targeted articleのアノテーションでちゃんとペアが設定されている場合
           articleNumPair = [
-            annotatorState.pairedArticleNum,
-            annotatorState.targetedArticleNum,
+            lawStates[action.selectedLaw].pairedArticleNum,
+            lawStates[action.selectedLaw].targetedArticleNum,
           ]
             .sort()
             .join(",");
         } else {
           alert("Select paired article.");
-          return annotatorState;
+          return lawStates;
         }
 
-        if (!newAnnotatorState.textLabel[articleNumPair]) {
-          newAnnotatorState.textLabel[articleNumPair] = {};
+        if (!newLawStates[action.selectedLaw].textLabel[articleNumPair]) {
+          newLawStates[action.selectedLaw].textLabel[articleNumPair] = {};
         }
-        newAnnotatorState.textLabel[articleNumPair][action.text.sentenceID] =
-          action.text.textLabels;
+        newLawStates[action.selectedLaw].textLabel[articleNumPair][
+          action.text.sentenceID
+        ] = action.text.textLabels;
 
         // 再レンダリング処理
-        newAnnotatorState.textLabel = { ...newAnnotatorState.textLabel };
-        newAnnotatorState.textLabel[articleNumPair] = {
-          ...newAnnotatorState.textLabel[articleNumPair],
+        newLawStates[action.selectedLaw].textLabel = {
+          ...newLawStates[action.selectedLaw].textLabel,
         };
-        return newAnnotatorState;
+        newLawStates[action.selectedLaw].textLabel[articleNumPair] = {
+          ...newLawStates[action.selectedLaw].textLabel[articleNumPair],
+        };
+        return newLawStates;
       }
       default:
-        return annotatorState;
+        return lawStates;
     }
   }
 
@@ -223,17 +200,30 @@ function Annotator(props: AnnotatorProps) {
     labeledArticleEl,
   });
   useEffect(() => {
-    globalData.sat!.initialize(
+    Array.from(document.querySelectorAll("canvas")).forEach((cv) => {
+      cv.parentNode?.removeChild(cv);
+    });
+    Array.from(document.querySelectorAll(".hide_spectrum_bar")).forEach(
+      (div) => {
+        div.parentNode?.removeChild(div);
+      }
+    );
+    props.sat.initialize(
       [
         [fulltextEl.current!, "visible"],
-        // [targetedArticleEl.current!, "hidden"],
-        // [labeledArticleEl.current!, "hidden"],
+        [targetedArticleEl.current!, "hidden"],
+        [labeledArticleEl.current!, "hidden"],
       ],
       0.5,
       true,
       false
     );
-    globalData.sat!.cv!.draw();
+    props.sat.word!.setOption({});
+    setTextHighlighterOption({
+      ...props.sat.word!.textHighlighterOption,
+      query: "",
+    });
+    props.sat.cv!.draw();
 
     hotkeys("command+shift+f", (event: Event, _handler: any) => {
       event.preventDefault();
@@ -251,21 +241,26 @@ function Annotator(props: AnnotatorProps) {
       div.click();
       setCaretToEnd(div);
     });
-  }, []);
+  }, [selectedLaw]);
 
-  const saveLabel = async () => {
-    const data: any = { ...annotatorState };
-    data.relation = Object.entries(annotatorState.relation).reduce(
-      (
-        prev: { [articleNum: string]: string[] },
-        [articleNum, relatedArticleSet]
-      ) => {
-        prev[articleNum] = Array.from(relatedArticleSet);
-        return prev;
-      },
-      {}
-    );
-    data.textHighlighterOption = textHighlighterOption;
+  const downloadLabel = async () => {
+    const data = {
+      lawStates: { ...lawStates } as any,
+    };
+    Object.entries(lawStates).forEach(([lawName, lawState]) => {
+      data.lawStates[lawName].relation = Object.entries(
+        lawState.relation
+      ).reduce(
+        (
+          prev: { [articleNum: string]: string[] },
+          [articleNum, relatedArticleSet]
+        ) => {
+          prev[articleNum] = Array.from(relatedArticleSet);
+          return prev;
+        },
+        {}
+      );
+    });
 
     const date = new Date();
     const dateStr =
@@ -299,23 +294,23 @@ function Annotator(props: AnnotatorProps) {
   };
 
   useEffect(() => {
-    if (globalData.sat!.cv) {
-      globalData.sat!.cv.updateData();
-      globalData.sat!.cv.draw();
+    if (props.sat.cv) {
+      props.sat.cv.updateData();
+      props.sat.cv.draw();
     } else {
-      alert("no sat cv");
+      console.log("no sat cv!");
+      console.log(props.sat);
     }
-  }, [textHighlighterOption]);
+  }, [textHighlighterOption, selectedLaw]);
 
-  console.log({ annotatorState });
   return (
     <Container id="main">
       <Row id="title">
         <Col>
           <h4>
             <ButtonGroup aria-label="Basic example">
-              {Object.entries(props.lawProps).map(([key, val]) => {
-                if (key === props.selectedLaw) {
+              {Object.entries(law.info).map(([key, val]) => {
+                if (key === selectedLaw) {
                   return (
                     <Button key={key} variant="primary">
                       {val.name}
@@ -331,7 +326,7 @@ function Annotator(props: AnnotatorProps) {
                         const clickedKey = (
                           e.target as HTMLButtonElement
                         ).attributes.getNamedItem("data-key")!.value;
-                        props.setSelectedLaw(clickedKey);
+                        setSelectedLaw(clickedKey);
                       }}
                     >
                       {val.name}
@@ -344,8 +339,9 @@ function Annotator(props: AnnotatorProps) {
         </Col>
         <Col>
           <Menu
-            setInitialStates={props.setInitialStates}
-            saveLabel={saveLabel}
+            dispatch={dispatch}
+            sat={props.sat}
+            downloadLabel={downloadLabel}
             setTextHighlighterOption={setTextHighlighterOption}
             textHighlighterOption={textHighlighterOption}
           ></Menu>
@@ -355,15 +351,14 @@ function Annotator(props: AnnotatorProps) {
         <Container>
           <Row className="oneRow">
             <Col className="col-6" ref={fulltextEl}>
-              {(props.selectedLaw === "jpPatent" ||
-                props.selectedLaw === "jpUtil") && (
+              {(selectedLaw === "jpPatent" || selectedLaw === "jpUtil") && (
                 <JPFullText
-                  selectedLaw={props.selectedLaw}
-                  targetedArticleNum={annotatorState.targetedArticleNum}
+                  selectedLaw={selectedLaw}
+                  targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
                   relation={
-                    annotatorState.targetedArticleNum
-                      ? annotatorState.relation[
-                          annotatorState.targetedArticleNum
+                    lawStates[selectedLaw].targetedArticleNum
+                      ? lawStates[selectedLaw].relation[
+                          lawStates[selectedLaw].targetedArticleNum!
                         ]
                       : new Set<string>()
                   }
@@ -371,13 +366,14 @@ function Annotator(props: AnnotatorProps) {
                   textHighlighterOption={textHighlighterOption}
                 />
               )}
-              {props.selectedLaw === "epc" && (
+              {selectedLaw === "epc" && (
                 <EPFullText
-                  targetedArticleNum={annotatorState.targetedArticleNum}
+                  selectedLaw={selectedLaw}
+                  targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
                   relation={
-                    annotatorState.targetedArticleNum
-                      ? annotatorState.relation[
-                          annotatorState.targetedArticleNum
+                    lawStates[selectedLaw].targetedArticleNum
+                      ? lawStates[selectedLaw].relation[
+                          lawStates[selectedLaw].targetedArticleNum!
                         ]
                       : new Set<string>()
                   }
@@ -387,14 +383,25 @@ function Annotator(props: AnnotatorProps) {
               )}
             </Col>
             <Col>
-              {(props.selectedLaw === "jpPatent" ||
-                props.selectedLaw === "jpUtil") && (
+              {(selectedLaw === "jpPatent" || selectedLaw === "jpUtil") && (
                 <JPTextAnnotator
-                  selectedLaw={props.selectedLaw}
-                  targetedArticleNum={annotatorState.targetedArticleNum}
-                  pairedArticleNum={annotatorState.pairedArticleNum}
-                  relation={annotatorState.relation}
-                  textLabel={annotatorState.textLabel}
+                  selectedLaw={selectedLaw}
+                  targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
+                  pairedArticleNum={lawStates[selectedLaw].pairedArticleNum}
+                  relation={lawStates[selectedLaw].relation}
+                  textLabel={lawStates[selectedLaw].textLabel}
+                  dispatch={dispatch}
+                  textHighlighterOption={textHighlighterOption}
+                  ref={textAnnotatorEls}
+                />
+              )}
+              {selectedLaw === "epc" && (
+                <EPTextAnnotator
+                  selectedLaw={selectedLaw}
+                  targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
+                  pairedArticleNum={lawStates[selectedLaw].pairedArticleNum}
+                  relation={lawStates[selectedLaw].relation}
+                  textLabel={lawStates[selectedLaw].textLabel}
                   dispatch={dispatch}
                   textHighlighterOption={textHighlighterOption}
                   ref={textAnnotatorEls}
@@ -409,6 +416,39 @@ function Annotator(props: AnnotatorProps) {
 }
 
 export default Annotator;
+
+const getInitialLawStates = (law: Law): { [lawName: string]: LawState } => {
+  const initialLawStates: { [lawName: string]: LawState } = [
+    "jpPatent",
+    "jpUtil",
+    "epc",
+  ].reduce((prev: { [lawName: string]: LawState }, lawName) => {
+    let initialRelation: { [articleNum: string]: Set<string> };
+    if (lawName === "jpPatent" || lawName === "jpUtil") {
+      initialRelation = Object.keys(
+        (law.content[lawName] as JPLawXML).Article
+      ).reduce((prev: { [articleNum: string]: Set<string> }, cur: string) => {
+        prev[cur] = new Set<string>();
+        return prev;
+      }, {});
+    } else {
+      initialRelation = (law.content["epc"] as EPLawXML).en.articleArr.reduce(
+        (prev: { [articleNum: string]: Set<string> }, cur) => {
+          prev[cur.articleNum] = new Set<string>();
+          return prev;
+        },
+        {}
+      );
+    }
+    prev[lawName] = {
+      relation: initialRelation,
+      textLabel: {},
+    };
+    return prev;
+  }, {});
+
+  return initialLawStates;
+};
 
 export const getArticleStatus = (
   labeledArticleNums: Set<string>,

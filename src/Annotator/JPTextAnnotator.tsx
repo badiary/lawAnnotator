@@ -1,11 +1,12 @@
 import React, { useState, useContext, useRef, forwardRef, memo } from "react";
-import { GlobalDataContext } from "./App";
+import { LawContext } from "./App";
 import { Container, Row, Col } from "react-bootstrap";
 import { TextHighlighter } from "./Annotator";
 import { TextAnnotateMulti } from "@badiary/react-text-annotate-multi";
-import { Article, ArticleMenu, Item, ParagraphSentence } from "./JPFullText";
+import { JPArticle, ArticleMenu, Item, ParagraphSentence } from "./JPFullText";
 
 interface SentenceGeneratorProps {
+  selectedLaw: string;
   labelName: string;
   targetedArticleNum?: string;
   pairedArticleNum?: string;
@@ -116,7 +117,7 @@ type TargetedArticleProps = {
   textHighlighterOption: TextHighlighterOption;
 };
 function TargetedArticle(props: TargetedArticleProps) {
-  const globalData = useContext(GlobalDataContext) as GlobalData;
+  const law = useContext(LawContext) as Law;
 
   return (
     <div id="targetedArticle">
@@ -124,7 +125,7 @@ function TargetedArticle(props: TargetedArticleProps) {
         <>
           <ArticleT
             article={
-              globalData.jpLaw[props.selectedLaw].Article[
+              (law.content[props.selectedLaw] as JPLawXML).Article[
                 props.targetedArticleNum
               ]
             }
@@ -132,16 +133,16 @@ function TargetedArticle(props: TargetedArticleProps) {
             articleNum={props.targetedArticleNum}
             {...props}
           ></ArticleT>
-          <Article
+          <JPArticle
             article={
-              globalData.jpLaw[props.selectedLaw].Article[
+              (law.content[props.selectedLaw] as JPLawXML).Article[
                 props.targetedArticleNum
               ]
             }
             articleStatus={"target"}
             lang="ja"
             {...props}
-          ></Article>
+          ></JPArticle>
         </>
       )}
     </div>
@@ -162,7 +163,7 @@ type LabeledArticleProps = {
 };
 function LabeledArticle(props: LabeledArticleProps) {
   const { articleNums, ...childProps } = props;
-  const globalData = useContext(GlobalDataContext) as GlobalData;
+  const law = useContext(LawContext) as Law;
   return (
     <div id="labeledArticle">
       {Array.from(props.articleNums)
@@ -172,7 +173,9 @@ function LabeledArticle(props: LabeledArticleProps) {
             <div key={articleNum}>
               <ArticleT
                 article={
-                  globalData.jpLaw[props.selectedLaw].Article[articleNum]
+                  (law.content[props.selectedLaw] as JPLawXML).Article[
+                    articleNum
+                  ]
                 }
                 articleStatus={getArticleStatus(
                   articleNum,
@@ -215,12 +218,12 @@ const sortArticleNum = (
 };
 
 export default TextAnnotator;
-type ArticleStatus = "none" | "target" | "paired";
+type ArticleStatusText = "none" | "target" | "paired";
 const getArticleStatus = (
   articleNum: string,
   targetedArticleNum: string | undefined,
   pairedArticleNum: string | undefined
-): ArticleStatus => {
+): ArticleStatusText => {
   if (articleNum === targetedArticleNum) {
     return "target";
   }
@@ -231,7 +234,7 @@ const getArticleStatus = (
 };
 interface ArticleProps extends SentenceGeneratorProps {
   article: ArticleXML;
-  articleStatus: ArticleStatus;
+  articleStatus: ArticleStatusText;
 }
 const ArticleT = memo((props: ArticleProps) => {
   // console.log(props);
@@ -273,6 +276,7 @@ const ArticleT = memo((props: ArticleProps) => {
             {props.article.ArticleTitleEn}
           </span>
           <ArticleMenu
+            selectedLaw={props.selectedLaw}
             target={menuTarget.current}
             showMenu={showMenu}
             setShowMenu={setShowMenu}
@@ -361,6 +365,7 @@ const Sentence = memo((props: SentenceProps) => {
             sentenceID: sentenceID,
             textLabels: textLabels,
           },
+          selectedLaw: props.selectedLaw,
         };
         props.dispatch(action);
       }}
@@ -382,8 +387,6 @@ const Sentence = memo((props: SentenceProps) => {
 const COLORS: { [labelName in LabelName]: string } = {
   definition: "GreenYellow",
   defined: "Lime",
-  reference: "#f9f",
-  referred: "#f3f",
   overwriting: "#ff9",
   overwritten: "#ff3",
 };
@@ -391,8 +394,6 @@ const COLORS: { [labelName in LabelName]: string } = {
 const LabelNameConverter: { [labelName in LabelName]: string } = {
   definition: "defined",
   defined: "definition",
-  reference: "referred",
-  referred: "reference",
   overwriting: "overwritten",
   overwritten: "overwriting",
 };

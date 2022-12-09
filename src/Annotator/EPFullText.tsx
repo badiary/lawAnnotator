@@ -1,78 +1,77 @@
 import React, { useState, useContext, useRef, memo } from "react";
-import { GlobalDataContext } from "./App";
+import { LawContext } from "./App";
 import { Container, Row, Col, Overlay, Accordion } from "react-bootstrap";
 import { TextHighlighter, getArticleStatus } from "./Annotator";
+import { TextAnnotateMulti } from "@badiary/react-text-annotate-multi";
+import { ArticleMenu } from "./JPFullText";
 
 type EPFullTextProps = {
+  selectedLaw: string;
   targetedArticleNum?: string;
   relation: Set<string>;
   dispatch: React.Dispatch<DispatchAction>;
   textHighlighterOption: TextHighlighterOption;
 };
 const EPFullText = (props: EPFullTextProps) => {
-  const globalData = useContext(GlobalDataContext) as GlobalData;
+  const law = useContext(LawContext) as Law;
 
   // console.log("rendering FullText");
   return (
     <div id="fulltext">
-      {globalData.epc.en.map((art: any, i: number) => {
-        return (
-          <React.Fragment key={i}>
-            <ArticleEN
-              article={art}
-              textHighlighterOption={props.textHighlighterOption}
-            />
-            <ArticleJA
-              articleNum={art.articleNum}
-              article={globalData.epc.ja[art.articleNum]}
-              textHighlighterOption={props.textHighlighterOption}
-            />
-          </React.Fragment>
-        );
-      })}
+      {(law.content["epc"] as EPLawXML).en.articleArr.map(
+        (article, i: number) => {
+          const articleStatus = getArticleStatus(
+            props.relation,
+            article.articleNum,
+            props.targetedArticleNum
+          );
+          return (
+            <React.Fragment key={i}>
+              <ArticleEN
+                selectedLaw={props.selectedLaw}
+                article={article}
+                articleStatus={articleStatus}
+                textHighlighterOption={props.textHighlighterOption}
+                dispatch={props.dispatch}
+              />
+              <EPArticleJA
+                articleNum={article.articleNum}
+                article={
+                  (law.content["epc"] as EPLawXML).ja[article.articleNum]
+                }
+                articleStatus={articleStatus}
+                textHighlighterOption={props.textHighlighterOption}
+              />
+            </React.Fragment>
+          );
+        }
+      )}
     </div>
   );
 };
 export default EPFullText;
 
 type ArticleENProps = {
-  article: any;
+  selectedLaw: string;
+  article: {
+    articleNum: string;
+    articleCaption: string;
+    content: string;
+  };
+  articleStatus: ArticleStatus;
   textHighlighterOption: TextHighlighterOption;
+  dispatch: React.Dispatch<DispatchAction>;
 };
-export const ArticleEN = memo((props: ArticleENProps) => {
-  return (
-    <div>
-      <h5>
-        Article {props.article.articleNum} - {props.article.artCaption}
-      </h5>
-      <div>{props.article.content}</div>
-    </div>
-  );
-});
-
-type ArticleJAProps = {
-  articleNum: string;
-  article: { title: string; content: string };
-  // articleStatus: ArticleStatus;
-  // dispatch: React.Dispatch<DispatchAction>;
-  textHighlighterOption: TextHighlighterOption;
-};
-export const ArticleJA = memo((props: ArticleJAProps) => {
-  // console.log(props);
-  // console.log(`rendering Article ${props.article.$.Num}`);
-  // console.log(`rendering Article`);
-
-  // const childProps = {
-  //   lang: props.lang,
-  //   sentenceGenerator: getSentenceGenerator(props.textHighlighterOption),
-  // };
+const ArticleEN = memo((props: ArticleENProps) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const menuTarget = useRef(null);
 
   let className = "";
-  // if (props.articleStatus === "target") {
-  //   className += " TOCArticleTargeted";
-  // } else if (props.articleStatus === "labeled") {
-  //   className += " articleLabeled";
-  // }
+  if (props.articleStatus === "target") {
+    className += " TOCArticleTargeted";
+  } else if (props.articleStatus === "labeled") {
+    className += " articleLabeled";
+  }
 
   const div = document.createElement("div");
   div.innerHTML = props.article.content;
@@ -86,8 +85,58 @@ export const ArticleJA = memo((props: ArticleJAProps) => {
   });
 
   return (
-    <div id={`article${props.articleNum}`} className={`article${className}`}>
-      <h5>{props.article.title}</h5>
+    <div
+      id={`article${props.article.articleNum}`}
+      className={`article${className}`}
+    >
+      <span
+        style={{ fontWeight: "bold", cursor: "pointer", color: "blue" }}
+        ref={menuTarget}
+        onClick={() => setShowMenu(!showMenu)}
+      >
+        Article {props.article.articleNum} - {props.article.articleCaption}
+      </span>
+      <ArticleMenu
+        selectedLaw={props.selectedLaw}
+        target={menuTarget.current}
+        showMenu={showMenu}
+        setShowMenu={setShowMenu}
+        articleNum={props.article.articleNum}
+        dispatch={props.dispatch}
+      ></ArticleMenu>
+      <div>{contentElements}</div>
+    </div>
+  );
+});
+
+type EPArticleJAProps = {
+  articleNum: string;
+  article: { title: string; content: string };
+  articleStatus: ArticleStatus;
+  textHighlighterOption: TextHighlighterOption;
+};
+export const EPArticleJA = memo((props: EPArticleJAProps) => {
+  let className = "";
+  if (props.articleStatus === "target") {
+    className += " TOCArticleTargeted";
+  } else if (props.articleStatus === "labeled") {
+    className += " articleLabeled";
+  }
+
+  const div = document.createElement("div");
+  div.innerHTML = props.article.content;
+
+  const contentElements = Array.from(div.childNodes).map((node, i) => {
+    return (
+      <React.Fragment key={i}>
+        {getJSXElement(node, props.textHighlighterOption)}
+      </React.Fragment>
+    );
+  });
+
+  return (
+    <div className={`article${className}`}>
+      <span style={{ fontWeight: "bold" }}>{props.article.title}</span>
       <div>{contentElements}</div>
     </div>
   );
@@ -106,7 +155,9 @@ const getJSXElement = (
       ></TextHighlighter>
     );
   } else {
-    if (node.nodeName === "DL") {
+    if (node.nodeName === "BR") {
+      return <></>;
+    } else if (node.nodeName === "DL") {
       return (
         <dl className="epc">
           {Array.from(node.childNodes).map((childNode, i) => {
@@ -133,13 +184,17 @@ const getJSXElement = (
     } else if (node.nodeName === "DD") {
       return (
         <dd>
-          {Array.from(node.childNodes).map((childNode, i) => {
-            return (
-              <React.Fragment key={i}>
-                {getJSXElement(childNode, textHighlighterOption)}
-              </React.Fragment>
-            );
-          })}
+          <span
+            data-sentenceid={(node as Element).getAttribute("data-sentenceid")}
+          >
+            {Array.from(node.childNodes).map((childNode, i) => {
+              return (
+                <React.Fragment key={i}>
+                  {getJSXElement(childNode, textHighlighterOption)}
+                </React.Fragment>
+              );
+            })}
+          </span>
         </dd>
       );
     } else if (node.nodeName === "DIV") {
@@ -169,6 +224,24 @@ const getJSXElement = (
     } else if (node.nodeName === "LI") {
       return (
         <li>
+          <span
+            data-sentenceid={(node as Element).getAttribute("data-sentenceid")}
+          >
+            {Array.from(node.childNodes).map((childNode, i) => {
+              return (
+                <React.Fragment key={i}>
+                  {getJSXElement(childNode, textHighlighterOption)}
+                </React.Fragment>
+              );
+            })}
+          </span>
+        </li>
+      );
+    } else if (node.nodeName === "SPAN") {
+      return (
+        <span
+          data-sentenceid={(node as Element).getAttribute("data-sentenceid")}
+        >
           {Array.from(node.childNodes).map((childNode, i) => {
             return (
               <React.Fragment key={i}>
@@ -176,11 +249,11 @@ const getJSXElement = (
               </React.Fragment>
             );
           })}
-        </li>
+        </span>
       );
     }
   }
 
-  console.log("error?");
+  console.log("error?", node);
   return <></>;
 };

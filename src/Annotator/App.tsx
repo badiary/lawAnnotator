@@ -4,9 +4,9 @@ import { kanji2number } from "@geolonia/japanese-numeral";
 import * as satModules from "./sat";
 
 // @ts-ignore
-export const GlobalDataContext = createContext<GlobalData>({});
+export const LawContext = createContext<Law>({});
 
-const lawProps: {
+const lawInfo: {
   [key: string]: {
     name: string;
     path: {
@@ -41,57 +41,30 @@ const lawProps: {
 };
 
 function App() {
-  // @ts-ignore
-  const [globalData, setGlobalData] = useState<GlobalData>({
-    initialStates: {},
-    jpLaw: {},
-    sat: new satModules.Sat(),
-  });
-  const [selectedLaw, setSelectedLaw] = useState("epc");
-  const [initialStates, setInitialStates] = useState({});
+  const [law, setLaw] = useState<Law>({ info: lawInfo, content: {} });
   const [loadingLaw, setLoadingLaw] = useState(true);
-  const [loadingInitialStates, setLoadingInitialStates] = useState(false);
+  const sat = new satModules.Sat();
 
   useEffect(() => {
     async function getLaw() {
       for (const lawName of ["jpPatent", "jpUtil"]) {
-        newGlobalData.jpLaw[lawName] = await getJPLaw(lawName);
+        newLaw.content[lawName] = await getJPLaw(lawName);
       }
-      newGlobalData.epc = await getEPLaw();
-      setGlobalData(newGlobalData);
-      console.log({ globalData });
+      newLaw.content["epc"] = await getEPLaw();
+      setLaw(newLaw);
+      console.log({ newLaw });
       setLoadingLaw(false);
     }
-    const newGlobalData = { ...globalData };
+    const newLaw = { ...law };
     setLoadingLaw(true);
     getLaw();
   }, []);
 
-  useEffect(() => {
-    setLoadingInitialStates(true);
-
-    const newGlobalData = { ...globalData };
-    newGlobalData.initialStates = initialStates;
-    setGlobalData(newGlobalData);
-
-    setLoadingInitialStates(false);
-  }, [initialStates]);
-
-  useEffect(() => {
-    setLoadingInitialStates(true);
-
-    // const newGlobalData = { ...globalData };
-    // newGlobalData.initialStates = initialStates;
-    // setGlobalData(newGlobalData);
-
-    setLoadingInitialStates(false);
-  }, [selectedLaw]);
-
   return (
     <>
-      {(loadingLaw || loadingInitialStates) && <p>loading...</p>}
-      {!(loadingLaw || loadingInitialStates) && (
-        <GlobalDataContext.Provider value={globalData}>
+      {loadingLaw && <p>loading...</p>}
+      {!loadingLaw && (
+        <LawContext.Provider value={law}>
           <div id="spinner">
             <div id="spinner_inside">
               <p id="loading_message"></p>
@@ -104,13 +77,8 @@ function App() {
             </div>
           </div>
 
-          <Annotator
-            lawProps={lawProps}
-            selectedLaw={selectedLaw}
-            setSelectedLaw={setSelectedLaw}
-            setInitialStates={setInitialStates}
-          />
-        </GlobalDataContext.Provider>
+          <Annotator sat={sat} />
+        </LawContext.Provider>
       )}
     </>
   );
@@ -119,11 +87,11 @@ function App() {
 export default App;
 
 const getJPLaw = async (lawName: string) => {
-  const result = await fetch(lawProps[lawName].path.chikujo!);
+  const result = await fetch(lawInfo[lawName].path.chikujo!);
   const data_chikujo = await result.text();
 
   // 対訳HTMLをLawXMLの形式に落とし込む
-  const result2 = await fetch(lawProps[lawName].path.taiyaku!);
+  const result2 = await fetch(lawInfo[lawName].path.taiyaku!);
   const data_taiyaku = await result2.text();
 
   const lawHTML = document.createElement("div");
@@ -131,7 +99,7 @@ const getJPLaw = async (lawName: string) => {
 
   const taiyakuLaw: JPLawXML = {
     $: {
-      Name: lawProps[lawName].name,
+      Name: lawInfo[lawName].name,
     },
     LawBody: {
       LawTitle: {
@@ -208,7 +176,7 @@ const getJPLaw = async (lawName: string) => {
 
 const getEPLaw = async () => {
   // ja
-  const result_ja = await fetch(lawProps["epc"].path.ja!);
+  const result_ja = await fetch(lawInfo["epc"].path.ja!);
   const epc_ja = await result_ja.text();
   const articleTitles = epc_ja.match(/^第[0-9a-z]+条 [^\r\n]+/gm)!;
   const contents = epc_ja.split(/^第[0-9a-z]+条 [^\r\n]+/gm)!.slice(1);
@@ -233,39 +201,125 @@ const getEPLaw = async () => {
   );
 
   // en
-
-  const result_en = await fetch(lawProps["epc"].path.en!);
+  const result_en = await fetch(lawInfo["epc"].path.en!);
   const epc_html = document.createElement("div");
   epc_html.innerHTML = await result_en.text();
-  const en = Array.from(epc_html.querySelectorAll(".pagebody")).map((art) => {
-    let [artTitle, artCaption] = (
-      art.querySelector("p.LMArtReg")! as HTMLElement
-    ).innerHTML
-      .trim()
-      .split("<br>");
-    const articleNum = artTitle.split("&nbsp;")[1].split("<")[0];
-    artCaption = artCaption.replace("\n", "").replace(/\s+/g, " ");
+  const enArr = Array.from(epc_html.querySelectorAll(".pagebody")).map(
+    (art) => {
+      let [articleTitle, articleCaption] = (
+        art.querySelector("p.LMArtReg")! as HTMLElement
+      ).innerHTML
+        .trim()
+        .split("<br>");
+      const articleNum = articleTitle.split("&nbsp;")[1].split("<")[0];
+      articleCaption = articleCaption.replace("\n", "").replace(/\s+/g, " ");
 
-    // 以下、content
-    let content = "";
-    if (art.querySelector("div.LMNormal")) {
-      // 箇条書きがない条文の場合
-      content = (art.querySelector("div.LMNormal")! as HTMLElement).innerText;
+      // 以下、content
+      let content = "";
+      if (art.querySelector("div.LMNormal")) {
+        // 箇条書きがない条文の場合
+        content = `<span data-sentenceid="${articleNum}-all">${(
+          art.querySelector("div.LMNormal")! as HTMLElement
+        ).innerText
+          .replace(/\s+/g, " ")
+          .replace(/\[ [0-9+] \]/, " ")
+          .replace(/\s+/g, " ")
+          .trim()}</span>`;
+      }
+      if (art.querySelector("div.DOC4NET2_LMNormal_spc")) {
+        // 箇条書きの条文の場合
+        content = Array.from(
+          art.querySelectorAll("div.DOC4NET2_LMNormal_spc")
+        ).reduce((prev: HTMLDListElement, cur: Element) => {
+          if (cur.querySelector("div.DOC4NET2_pos_LMNormal_2")) {
+            const div = document.createElement("div");
+            div.innerText = (
+              cur.querySelector("div.DOC4NET2_pos_LMNormal_2") as HTMLElement
+            ).innerText
+              .replace(/\s+/g, " ")
+              .replace(/\[ [0-9+] \]/, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+            div.setAttribute("data-sentenceid", `${articleNum}-LMNormal2`);
+            prev.appendChild(div);
+            return prev;
+          }
+
+          const dtNum = (
+            cur.querySelector("div.DOC4NET2_pos_LMNormal") as HTMLElement
+          ).innerText.match(/(\([0-9a-z]+\))|-/)![0];
+          const ddContent = (
+            cur.querySelector("div.DOC4NET2_pos_LMNormal_1") as HTMLElement
+          ).innerText;
+          const dt = document.createElement("dt");
+          dt.innerText = dtNum;
+          const dd = document.createElement("dd");
+          const span = document.createElement("span");
+          span.innerText = ddContent
+            .replace(/\s+/g, " ")
+            .replace(/\[ [0-9+] \]/, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          span.setAttribute("data-sentenceid", `${articleNum}-${dtNum}`);
+          dd.appendChild(span);
+
+          const div = document.createElement("div");
+          div.appendChild(dt);
+          div.appendChild(dd);
+
+          if (dtNum === "(a)") {
+            const childDl = document.createElement("dl");
+            childDl.appendChild(div);
+            if (prev.querySelector("dd:last-child")) {
+              prev.querySelector("dd:last-child")!.appendChild(childDl);
+            } else {
+              prev.appendChild(childDl);
+            }
+          } else if (/\([b-z]\)/.test(dtNum)) {
+            const childDl = prev.querySelector("dl")!;
+            childDl.appendChild(div);
+          } else if (dtNum === "-") {
+            if (!prev.querySelector("ul")) {
+              const ul = document.createElement("ul");
+              prev.appendChild(ul);
+            }
+            const li = document.createElement("li");
+            li.innerText = ddContent;
+            li.setAttribute("data-sentenceid", `${articleNum}-${dtNum}`);
+            prev.querySelector("ul")?.appendChild(li);
+          } else {
+            prev.appendChild(div);
+          }
+
+          return prev;
+        }, document.createElement("dl")).outerHTML;
+      }
+
+      return { articleNum, articleCaption, content };
     }
-    if (art.querySelector("div.DOC4NET2_LMNormal_spc")) {
-      // 箇条書きの条文の場合
-      content = Array.from(art.querySelectorAll("div.DOC4NET2_LMNormal_spc"))
-        .map((block) => {
-          return (block as HTMLElement).innerText;
-        })
-        .join("\n");
-    }
+  );
+  const enObj = enArr.reduce(
+    (
+      prev: {
+        [articleNum: string]: {
+          articleNum: string;
+          articleCaption: string;
+          content: string;
+        };
+      },
+      cur
+    ) => {
+      prev[cur.articleNum] = {
+        articleNum: cur.articleNum,
+        articleCaption: cur.articleCaption,
+        content: cur.content,
+      };
+      return prev;
+    },
+    {}
+  );
 
-    return { articleNum, artCaption, content };
-  });
-
-  console.log(en);
-  return { en: en, ja: ja };
+  return { en: { articleObj: enObj, articleArr: enArr }, ja: ja };
 };
 
 // 以下、対訳HTMLのパース用関数

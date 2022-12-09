@@ -1,57 +1,27 @@
-import React, { useRef, useEffect, useState, useContext } from "react";
-import { GlobalDataContext } from "./App";
+import React, { useRef, useEffect, useState } from "react";
 import * as satModules from "./sat";
 
 type MenuProps = {
-  setInitialStates: React.Dispatch<
-    React.SetStateAction<{ [lawName: string]: InitialState }>
-  >;
-  saveLabel: () => Promise<void>;
+  dispatch: React.Dispatch<DispatchAction>;
+  sat: satModules.Sat;
+  downloadLabel: () => Promise<void>;
   setTextHighlighterOption: React.Dispatch<React.SetStateAction<any>>;
   textHighlighterOption: TextHighlighterOption;
 };
 const Menu = (props: MenuProps) => {
-  const globalData = useContext(GlobalDataContext) as GlobalData;
   const wordQueryEl = useRef<HTMLDivElement>(null);
-  const [lightness, setLightness] = useState(0.5);
-  const [blockMode, setBlockMode] = useState(true);
-
-  const onChangeLightness = (e: any) => {
-    setLightness(e.target.value);
-    if (globalData.sat!.word && globalData.sat!.cv) {
-      if (e.target instanceof HTMLInputElement) {
-        globalData.sat!.word.lightness = Number(e.target.value);
-        globalData.sat!.word.setOption(getWordOption());
-        setColoredQuery();
-      }
-    }
-  };
-
-  const onChangeBlockMode = (e: any) => {
-    setBlockMode(!blockMode);
-    showSpinner("ワード反転中...", 10, () => {
-      if (globalData.sat!.word && globalData.sat!.cv) {
-        if (e.target instanceof HTMLInputElement && !blockMode) {
-          globalData.sat!.word.block_mode = true;
-        } else {
-          globalData.sat!.word.block_mode = false;
-        }
-      }
-    });
-  };
 
   useEffect(() => {
     wordQueryEl.current!.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
         showSpinner("ワード反転中...", 10, () => {
-          if (globalData.sat!.word && globalData.sat!.cv) {
-            globalData.sat!.word.setOption(getWordOption());
+          if (props.sat.word && props.sat.cv) {
+            props.sat.word.setOption(getWordOption());
 
             props.setTextHighlighterOption({
-              ...globalData.sat!.word.textHighlighterOption,
+              ...props.sat.word.textHighlighterOption,
               query: wordQueryEl.current!.innerText,
             });
-            // globalData.sat!.word.invert();
             setColoredQuery();
             wordQueryEl.current!.blur();
           }
@@ -60,25 +30,22 @@ const Menu = (props: MenuProps) => {
         e.preventDefault();
       }
     });
-  });
-
-  useEffect(() => {
-    const query_div = wordQueryEl.current!;
-    query_div.innerText = props.textHighlighterOption.query;
-    if (query_div.innerText) {
-      showSpinner("ワード反転中...", 10, () => {
-        if (globalData.sat!.word && globalData.sat!.cv) {
-          globalData.sat!.word.setOption(getWordOption());
-
-          // props.setTextHighlighterOption({
-          //   ...globalData.sat!.word.textHighlighterOption,
-          // });
-          setColoredQuery();
-          wordQueryEl.current!.blur();
-        }
-      });
-    }
   }, []);
+
+  // useEffect(() => {
+  //   const query_div = wordQueryEl.current!;
+  //   query_div.innerText = props.textHighlighterOption.query;
+  //   if (query_div.innerText) {
+  //     showSpinner("ワード反転中...", 10, () => {
+  //       if (props.sat.word && props.sat.cv) {
+  //         props.sat.word.setOption(getWordOption());
+
+  //         setColoredQuery();
+  //         wordQueryEl.current!.blur();
+  //       }
+  //     });
+  //   }
+  // }, []);
 
   /**
    * #word_query内に入力されたクエリからワード反転のオプションを生成
@@ -108,7 +75,7 @@ const Menu = (props: MenuProps) => {
     });
 
     // 反転ワード情報を更新
-    const colors = globalData.sat!.word!.getWordColors(word_arr.length);
+    const colors = props.sat.word!.getWordColors(word_arr.length);
 
     const word_option: { [color_id: string]: satModules.WordOption } = {};
     word_arr.forEach((words: string[], i: number) => {
@@ -164,8 +131,8 @@ const Menu = (props: MenuProps) => {
     const query_div = wordQueryEl.current!;
     query_div.innerHTML = "";
 
-    Object.keys(globalData.sat!.word!.option).forEach((color_id) => {
-      globalData.sat!.word!.option[color_id]!.words.forEach(
+    Object.keys(props.sat.word!.option).forEach((color_id) => {
+      props.sat.word!.option[color_id]!.words.forEach(
         (word: string, j: number) => {
           const span = document.createElement("span");
           span.innerText = word.replace(/ /g, "_");
@@ -175,7 +142,7 @@ const Menu = (props: MenuProps) => {
           span.classList.add(`word_inversion_class${color_id}`);
 
           query_div.appendChild(span);
-          if (j !== globalData.sat!.word!.option[color_id]!.words.length - 1) {
+          if (j !== props.sat.word!.option[color_id]!.words.length - 1) {
             query_div.appendChild(document.createTextNode("+"));
           }
         }
@@ -204,7 +171,10 @@ const Menu = (props: MenuProps) => {
               //読込終了後の処理
               reader.onload = function (ev) {
                 //テキストエリアに表示する
-                props.setInitialStates(JSON.parse(reader.result as string));
+                props.dispatch({
+                  type: "load",
+                  json: reader.result as string,
+                });
               };
             }}
           />
@@ -213,7 +183,7 @@ const Menu = (props: MenuProps) => {
           <a
             href="#"
             onClick={async (e) => {
-              props.saveLabel();
+              props.downloadLabel();
             }}
           >
             <img
@@ -226,44 +196,6 @@ const Menu = (props: MenuProps) => {
         </li>
 
         <li className="blank"></li>
-        <li id="word_menu">
-          <div>
-            <label>
-              <img
-                src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAzUExURQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKMFRskAAAAQdFJOUwAQIDBAUGBwgI+fr7/P3+8jGoKKAAAACXBIWXMAAA7DAAAOwwHHb6hkAAACNUlEQVRoQ+2Y2ZqDIAyFiwu4Vt7/aYeEdAZlldSr4b8Rv8I5GCCmvhqNRqNxRe0GSTdPMGnDRDdP0AyyNAMX0VHDJWrQ07UcsRyBQTGD/r1RqxSxaB1wiBj0b63vOYB+yCFsAPo3HcQOQ3yHoIHV1+/QokWJOMh1WdZLsqvSjz+DR6V+sUO1fqEDQz/kIPphlIMjxtL/daBd06n9wHut14kUJd7W6pOD1e/mj7plsaLKNOv10QH1xUUemLGHYukbZdz0YiXRE7uA3yRL30JL6ZE/JGWIiL5x+MLsY/Gx7NSHBSa4GAt1YtD5+8eFH6SZlCKs1K0akX4A/iPAUU2iqGMtiS1k4W6kXIS0xvNcipodIEt0pJIAjvNpXCpoGw1CoEzoqZ1gMN1OgUwF7WQAh8gm/CQw4ToD2OIjtRNAJOsNBmonGE23YoNROcDUBA1KAIs80BDkUjelKTBgHuXHD1p2G3ml8E2yMWLnayzk47DTdeYRvvHeT74ybXHE5HT6ztjSiMvTZUui8IIswaTH5E5l9oUd5y9Zy2zmbl8ffm1xLBh/xdpIGBvr0F/Ow2ZloSaod6DYU3YU6rOdjm0iTZtIah1I363/u1HKof/bm/6/rBsE9H0YDkX6DIdC/WqHiP64LvP1U0KVQxeZf/BjyMch+7AuuOv9+IQ/51iH+V7iMw6B+IcN0OGmvnEIrW/EwDjc1jfrQFeXmIGxoCuTuMGXaAZZmkEWuRlu1f+NRqPxH3i9fgAWBlzMj3oL1wAAAABJRU5ErkJggg=="
-                className="icon"
-                title="ワード反転色の輝度"
-                alt="ワード反転色の輝度"
-              />
-            </label>
-            <input
-              type="range"
-              id="word_inversion_lightness"
-              name="word_inversion_lightness"
-              min="0.2"
-              max="0.8"
-              step="0.1"
-              value={lightness}
-              onChange={onChangeLightness}
-            />
-          </div>
-          <div>
-            <label>
-              <input
-                type="checkbox"
-                id="block_mode"
-                checked={blockMode}
-                onChange={onChangeBlockMode}
-              />
-              <img
-                src="data:image/png;base64,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"
-                className="icon"
-                title="ブロック反転（反転範囲を漢字・カタカナ・英語が連続する範囲まで広げます）"
-                alt="ブロック反転（反転範囲を漢字・カタカナ・英語が連続する範囲まで広げます）"
-              />
-            </label>
-          </div>
-        </li>
         <li>
           <div
             id="word_query"

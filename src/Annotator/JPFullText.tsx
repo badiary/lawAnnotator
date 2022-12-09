@@ -1,5 +1,5 @@
 import { useState, useContext, useRef, memo } from "react";
-import { GlobalDataContext } from "./App";
+import { LawContext } from "./App";
 import { Container, Row, Col, Overlay, Accordion } from "react-bootstrap";
 import { TextHighlighter, getArticleStatus } from "./Annotator";
 
@@ -11,18 +11,18 @@ type JPFullTextProps = {
   textHighlighterOption: TextHighlighterOption;
 };
 const JPFullText = (props: JPFullTextProps) => {
-  const globalData = useContext(GlobalDataContext) as GlobalData;
+  const law = useContext(LawContext) as Law;
 
   // console.log("rendering FullText");
   return (
     <div id="fulltext">
-      {globalData.jpLaw[props.selectedLaw].LawBody.MainProvision.Chapter.map(
-        (chapter: ChapterXML, i: number) => {
-          return (
-            <Chapter key={i} chapter={chapter} {...props} lang="ja"></Chapter>
-          );
-        }
-      )}
+      {(
+        law.content[props.selectedLaw] as JPLawXML
+      ).LawBody.MainProvision.Chapter.map((chapter: ChapterXML, i: number) => {
+        return (
+          <Chapter key={i} chapter={chapter} {...props} lang="ja"></Chapter>
+        );
+      })}
     </div>
   );
 };
@@ -39,7 +39,6 @@ type ChapterProps = {
 };
 
 const Chapter = (props: ChapterProps) => {
-  // console.log(props.chapter);
   // console.log("rendering Chapter");
   const { chapter, ...childProps } = props;
 
@@ -68,7 +67,7 @@ const Chapter = (props: ChapterProps) => {
       {!props.chapter.Section &&
         props.chapter.Article!.map((article: ArticleXML, i: number) => {
           return (
-            <Article
+            <JPArticle
               selectedLaw={props.selectedLaw}
               key={i}
               article={article}
@@ -80,7 +79,7 @@ const Chapter = (props: ChapterProps) => {
               dispatch={props.dispatch}
               textHighlighterOption={props.textHighlighterOption}
               lang={props.lang}
-            ></Article>
+            ></JPArticle>
           );
         })}
     </div>
@@ -110,7 +109,7 @@ const Section = (props: SectionProps) => {
       </h3>
       {props.section.Article.map((article: ArticleXML, i: number) => {
         return (
-          <Article
+          <JPArticle
             key={i}
             selectedLaw={props.selectedLaw}
             article={article}
@@ -122,14 +121,14 @@ const Section = (props: SectionProps) => {
             dispatch={props.dispatch}
             textHighlighterOption={props.textHighlighterOption}
             lang={props.lang}
-          ></Article>
+          ></JPArticle>
         );
       })}
     </div>
   );
 };
 
-type ArticleProps = {
+type JPArticleProps = {
   selectedLaw: string;
   article: ArticleXML;
   articleStatus: ArticleStatus;
@@ -137,7 +136,7 @@ type ArticleProps = {
   textHighlighterOption: TextHighlighterOption;
   lang: "ja" | "en";
 };
-export const Article = memo((props: ArticleProps) => {
+export const JPArticle = memo((props: JPArticleProps) => {
   // console.log(props);
   // console.log(`rendering Article ${props.article.$.Num}`);
   // console.log(`rendering Article`);
@@ -188,6 +187,7 @@ export const Article = memo((props: ArticleProps) => {
             {props.lang === "en" && props.article.ArticleTitleEn}
           </span>
           <ArticleMenu
+            selectedLaw={props.selectedLaw}
             target={menuTarget.current}
             showMenu={showMenu}
             setShowMenu={setShowMenu}
@@ -255,6 +255,7 @@ export const Article = memo((props: ArticleProps) => {
 });
 
 type ArticleMenuProps = {
+  selectedLaw: string;
   target: any;
   showMenu: boolean;
   setShowMenu: React.Dispatch<React.SetStateAction<boolean>>;
@@ -288,7 +289,7 @@ export const ArticleMenu = memo((props: ArticleMenuProps) => {
                           | "target"
                           | "addArticle"
                           | "deleteArticle",
-
+                        selectedLaw: props.selectedLaw,
                         articleNum: props.articleNum,
                       });
                       props.setShowMenu(!props.showMenu);
@@ -313,8 +314,10 @@ type ChikujoProps = {
 };
 export const Chikujo = memo((props: ChikujoProps) => {
   // console.log("rendering Chikujo");
-  const globalData = useContext(GlobalDataContext) as GlobalData;
-  const content = globalData.jpLaw[props.selectedLaw].Chikujo[props.articleNum];
+  const law = useContext(LawContext) as Law;
+  const content = (law.content[props.selectedLaw] as JPLawXML).Chikujo[
+    props.articleNum
+  ];
   if (content) {
     return (
       // <Accordion defaultActiveKey="0">
