@@ -1,21 +1,18 @@
 import { useState, useContext, useRef, memo } from "react";
 import { LawContext } from "./App";
 import { Container, Row, Col, Overlay, Accordion } from "react-bootstrap";
-import { TextHighlighter, getArticleStatus } from "./Annotator";
+import { CommonProps, getArticleStatus } from "./Annotator";
+import { TextHighlighter, TextHighlighterOption } from "./spectrum";
 
-type JPFullTextProps = {
-  selectedLaw: string;
-  targetedArticleNum?: string;
-  relation: Set<string>;
-  dispatch: React.Dispatch<DispatchAction>;
-  textHighlighterOption: TextHighlighterOption;
-};
-const JPFullText = (props: JPFullTextProps) => {
+interface FullTextJPProps extends Omit<CommonProps, "relation"> {
+  relatedArticleNumSet: Set<string>;
+}
+const FullTextJP = (props: FullTextJPProps) => {
   const law = useContext(LawContext) as Law;
 
   // console.log("rendering FullText");
   return (
-    <div id="fulltext">
+    <>
       {(
         law.content[props.selectedLaw] as JPLawXML
       ).LawBody.MainProvision.Chapter.map((chapter: ChapterXML, i: number) => {
@@ -23,25 +20,18 @@ const JPFullText = (props: JPFullTextProps) => {
           <Chapter key={i} chapter={chapter} {...props} lang="ja"></Chapter>
         );
       })}
-    </div>
+    </>
   );
 };
-export default JPFullText;
+export default FullTextJP;
 
-type ChapterProps = {
-  selectedLaw: string;
+interface ChapterProps extends FullTextJPProps {
   chapter: ChapterXML;
-  targetedArticleNum?: string;
-  relation: Set<string>;
-  dispatch: React.Dispatch<DispatchAction>;
-  textHighlighterOption: TextHighlighterOption;
   lang: "ja" | "en";
-};
-
+}
 const Chapter = (props: ChapterProps) => {
   // console.log("rendering Chapter");
   const { chapter, ...childProps } = props;
-
   return (
     <div id={`chapter${props.chapter.$.Num}`}>
       {props.lang === "ja" && (
@@ -67,34 +57,29 @@ const Chapter = (props: ChapterProps) => {
       {!props.chapter.Section &&
         props.chapter.Article!.map((article: ArticleXML, i: number) => {
           return (
-            <JPArticle
+            <ArticleJP
               selectedLaw={props.selectedLaw}
               key={i}
               article={article}
               articleStatus={getArticleStatus(
-                props.relation,
+                props.relatedArticleNumSet,
                 article.$.Num,
                 props.targetedArticleNum
               )}
               dispatch={props.dispatch}
               textHighlighterOption={props.textHighlighterOption}
               lang={props.lang}
-            ></JPArticle>
+            ></ArticleJP>
           );
         })}
     </div>
   );
 };
 
-type SectionProps = {
-  selectedLaw: string;
+interface SectionProps extends FullTextJPProps {
   section: SectionXML;
-  targetedArticleNum?: string;
-  relation: Set<string>;
-  dispatch: React.Dispatch<DispatchAction>;
-  textHighlighterOption: TextHighlighterOption;
   lang: "ja" | "en";
-};
+}
 const Section = (props: SectionProps) => {
   // console.log(props.section);
   // console.log("rendering Section");
@@ -109,34 +94,31 @@ const Section = (props: SectionProps) => {
       </h3>
       {props.section.Article.map((article: ArticleXML, i: number) => {
         return (
-          <JPArticle
+          <ArticleJP
             key={i}
             selectedLaw={props.selectedLaw}
             article={article}
             articleStatus={getArticleStatus(
-              props.relation,
+              props.relatedArticleNumSet,
               article.$.Num,
               props.targetedArticleNum
             )}
             dispatch={props.dispatch}
             textHighlighterOption={props.textHighlighterOption}
             lang={props.lang}
-          ></JPArticle>
+          ></ArticleJP>
         );
       })}
     </div>
   );
 };
 
-type JPArticleProps = {
-  selectedLaw: string;
+interface ArticleJPProps extends Omit<FullTextJPProps, "relatedArticleNumSet"> {
   article: ArticleXML;
   articleStatus: ArticleStatus;
-  dispatch: React.Dispatch<DispatchAction>;
-  textHighlighterOption: TextHighlighterOption;
   lang: "ja" | "en";
-};
-export const JPArticle = memo((props: JPArticleProps) => {
+}
+export const ArticleJP = memo((props: ArticleJPProps) => {
   // console.log(props);
   // console.log(`rendering Article ${props.article.$.Num}`);
   // console.log(`rendering Article`);
@@ -340,50 +322,6 @@ export const Chikujo = memo((props: ChikujoProps) => {
   }
 });
 
-// type ParagraphProps = {
-//   paragraph: ParagraphXML;
-//   lang: "ja" | "en";
-//   sentenceGenerator: (props: SentenceProps) => JSX.Element;
-// };
-// const Paragraph = memo((props: ParagraphProps) => {
-//   // console.log(props.paragraph);
-//   // console.log("rendering Paragraph")
-//   const { paragraph, ...childProps } = props;
-
-//   return (
-//     <>
-//       <span className="paragraph">
-//         {Array.isArray(props.paragraph.ParagraphSentence) &&
-//           props.paragraph.ParagraphSentence.map(
-//             (paragraphSentence: ParagraphSentenceXML, i: number) => {
-//               return (
-//                 <ParagraphSentence
-//                   key={i}
-//                   {...childProps}
-//                   paragraphSentence={paragraphSentence}
-//                 ></ParagraphSentence>
-//               );
-//             }
-//           )}
-//         {!Array.isArray(props.paragraph.ParagraphSentence) && (
-//           <ParagraphSentence
-//             {...childProps}
-//             paragraphSentence={props.paragraph.ParagraphSentence}
-//           ></ParagraphSentence>
-//         )}
-//       </span>
-//       {props.paragraph.Item &&
-//         Array.isArray(props.paragraph.Item) &&
-//         props.paragraph.Item.map((item: ItemXML, i: number) => {
-//           return <Item key={i} {...childProps} item={item}></Item>;
-//         })}
-//       {props.paragraph.Item && !Array.isArray(props.paragraph.Item) && (
-//         <Item {...childProps} item={props.paragraph.Item}></Item>
-//       )}
-//     </>
-//   );
-// });
-
 type ParagraphSentenceProps = {
   paragraphSentence: ParagraphSentenceXML;
   lang: "ja" | "en";
@@ -391,8 +329,6 @@ type ParagraphSentenceProps = {
 };
 export const ParagraphSentence = memo((props: ParagraphSentenceProps) => {
   // console.log(props.paragraphSentence);
-
-  const { paragraphSentence, ...childProps } = props;
   return (
     <span>
       {Array.isArray(props.paragraphSentence.Sentence) &&
@@ -401,16 +337,16 @@ export const ParagraphSentence = memo((props: ParagraphSentenceProps) => {
             return (
               <props.sentenceGenerator
                 key={i}
-                {...childProps}
-                sentence={sentence}
+                content={sentence._}
+                sentenceID={sentence.$.Num}
               ></props.sentenceGenerator>
             );
           }
         )}
       {!Array.isArray(props.paragraphSentence.Sentence) && (
         <props.sentenceGenerator
-          {...childProps}
-          sentence={props.paragraphSentence.Sentence}
+          content={props.paragraphSentence.Sentence._}
+          sentenceID={props.paragraphSentence.Sentence.$.Num}
         ></props.sentenceGenerator>
       )}
     </span>
@@ -465,8 +401,8 @@ const ItemSentence = memo((props: ItemSentenceProps) => {
           return (
             <props.sentenceGenerator
               key={i}
-              {...childProps}
-              sentence={sentence}
+              content={sentence._}
+              sentenceID={sentence.$.Num}
             ></props.sentenceGenerator>
           );
         }
@@ -474,8 +410,8 @@ const ItemSentence = memo((props: ItemSentenceProps) => {
     } else {
       sentence = (
         <props.sentenceGenerator
-          {...childProps}
-          sentence={props.itemSentence.Sentence}
+          content={props.itemSentence.Sentence._}
+          sentenceID={props.itemSentence.Sentence.$.Num}
         ></props.sentenceGenerator>
       );
     }
@@ -508,24 +444,21 @@ type ColumnProps = {
 };
 const Column = memo((props: ColumnProps) => {
   // console.log(props.column);
-  const { column, ...childProps } = props;
   return (
     <span className="column">
       {Array.isArray(props.column.Sentence) &&
         props.column.Sentence.map((sentence: SentenceXML, i: number) => {
-          // return (
-          //   <Sentence key={i} {...childProps} sentence={sentence}></Sentence>
-          // );
           return (
             <props.sentenceGenerator
-              sentence={sentence}
+              content={sentence._}
+              sentenceID={sentence.$.Num}
             ></props.sentenceGenerator>
           );
         })}
       {!Array.isArray(props.column.Sentence) && (
         <props.sentenceGenerator
-          {...childProps}
-          sentence={props.column.Sentence}
+          content={props.column.Sentence._}
+          sentenceID={props.column.Sentence.$.Num}
         ></props.sentenceGenerator>
       )}
     </span>
@@ -533,14 +466,15 @@ const Column = memo((props: ColumnProps) => {
 });
 
 type SentenceProps = {
-  sentence: SentenceXML;
+  content: string;
+  sentenceID?: string;
 };
 
 const getSentenceGenerator = (textHighlighterOption: TextHighlighterOption) => {
-  return (props: { sentence: SentenceXML }) => {
+  return (props: SentenceProps) => {
     return (
       <TextHighlighter
-        text={props.sentence._}
+        text={props.content}
         textHighlighterOption={textHighlighterOption}
       ></TextHighlighter>
     );

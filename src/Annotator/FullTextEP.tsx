@@ -1,40 +1,35 @@
 import React, { useState, useContext, useRef, memo } from "react";
 import { LawContext } from "./App";
-import { Container, Row, Col, Overlay, Accordion } from "react-bootstrap";
-import { TextHighlighter, getArticleStatus } from "./Annotator";
-import { TextAnnotateMulti } from "@badiary/react-text-annotate-multi";
-import { ArticleMenu } from "./JPFullText";
+import { CommonProps, getArticleStatus } from "./Annotator";
+import { ArticleMenu } from "./FullTextJP";
+import { TextHighlighter, TextHighlighterOption } from "./spectrum";
 
-type EPFullTextProps = {
-  selectedLaw: string;
-  targetedArticleNum?: string;
-  relation: Set<string>;
-  dispatch: React.Dispatch<DispatchAction>;
-  textHighlighterOption: TextHighlighterOption;
-};
-const EPFullText = (props: EPFullTextProps) => {
+interface FullTextEPProps extends Omit<CommonProps, "relation"> {
+  relatedArticleNumSet: Set<string>;
+}
+const FullTextEP = (props: FullTextEPProps) => {
   const law = useContext(LawContext) as Law;
 
   // console.log("rendering FullText");
   return (
-    <div id="fulltext">
+    <>
       {(law.content["epc"] as EPLawXML).en.articleArr.map(
         (article, i: number) => {
           const articleStatus = getArticleStatus(
-            props.relation,
+            props.relatedArticleNumSet,
             article.articleNum,
             props.targetedArticleNum
           );
           return (
             <React.Fragment key={i}>
-              <ArticleEN
+              <ArticleEP
                 selectedLaw={props.selectedLaw}
                 article={article}
                 articleStatus={articleStatus}
                 textHighlighterOption={props.textHighlighterOption}
                 dispatch={props.dispatch}
               />
-              <EPArticleJA
+              <ArticleEPJA
                 articleNum={article.articleNum}
                 article={
                   (law.content["epc"] as EPLawXML).ja[article.articleNum]
@@ -46,23 +41,31 @@ const EPFullText = (props: EPFullTextProps) => {
           );
         }
       )}
-    </div>
+    </>
   );
 };
-export default EPFullText;
+export default FullTextEP;
 
-type ArticleENProps = {
-  selectedLaw: string;
+interface ArticleEPProps extends Omit<FullTextEPProps, "relatedArticleNumSet"> {
   article: {
     articleNum: string;
     articleCaption: string;
     content: string;
   };
   articleStatus: ArticleStatus;
-  textHighlighterOption: TextHighlighterOption;
-  dispatch: React.Dispatch<DispatchAction>;
-};
-const ArticleEN = memo((props: ArticleENProps) => {
+}
+// type ArticleENProps = {
+//   selectedLaw: string;
+//   article: {
+//     articleNum: string;
+//     articleCaption: string;
+//     content: string;
+//   };
+//   articleStatus: ArticleStatus;
+//   textHighlighterOption: TextHighlighterOption;
+//   dispatch: React.Dispatch<DispatchAction>;
+// };
+const ArticleEP = memo((props: ArticleEPProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const menuTarget = useRef(null);
 
@@ -94,7 +97,11 @@ const ArticleEN = memo((props: ArticleENProps) => {
         ref={menuTarget}
         onClick={() => setShowMenu(!showMenu)}
       >
-        Article {props.article.articleNum} - {props.article.articleCaption}
+        Article {props.article.articleNum} -{" "}
+        <TextHighlighter
+          text={props.article.articleCaption}
+          textHighlighterOption={props.textHighlighterOption}
+        />
       </span>
       <ArticleMenu
         selectedLaw={props.selectedLaw}
@@ -109,13 +116,13 @@ const ArticleEN = memo((props: ArticleENProps) => {
   );
 });
 
-type EPArticleJAProps = {
+type ArticleEPJAProps = {
   articleNum: string;
   article: { title: string; content: string };
   articleStatus: ArticleStatus;
   textHighlighterOption: TextHighlighterOption;
 };
-export const EPArticleJA = memo((props: EPArticleJAProps) => {
+export const ArticleEPJA = memo((props: ArticleEPJAProps) => {
   let className = "";
   if (props.articleStatus === "target") {
     className += " TOCArticleTargeted";
@@ -136,7 +143,12 @@ export const EPArticleJA = memo((props: EPArticleJAProps) => {
 
   return (
     <div className={`article${className}`}>
-      <span style={{ fontWeight: "bold" }}>{props.article.title}</span>
+      <span style={{ fontWeight: "bold" }}>
+        <TextHighlighter
+          text={props.article.title}
+          textHighlighterOption={props.textHighlighterOption}
+        />
+      </span>
       <div>{contentElements}</div>
     </div>
   );

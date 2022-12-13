@@ -1,4 +1,4 @@
-import { Sat } from "../Annotator/sat";
+export {};
 declare global {
   type Law = {
     info: {
@@ -143,12 +143,6 @@ declare global {
     json?: string;
   };
 
-  type TextHighlighterOption = {
-    words: string[];
-    className: { [word: string]: string };
-    query: string;
-  };
-
-  type ArticleStatus = "none" | "target" | "labeled";
+  type ArticleStatus = "none" | "target" | "labeled" | "paired";
   type LabelName = "definition" | "defined" | "overwriting" | "overwritten";
 }

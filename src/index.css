@@ -422,32 +422,6 @@ div#word_query:empty:before {
   color: #888;
 }
 
-canvas.spectrum_bar {
-  background-color: black;
-  position: absolute;
-  top: 0%;
-  right: 0%;
-  opacity: 0.5;
-  z-index: 9999997;
-  width: 200px !important;
-}
-
-canvas.spectrum_bar:hover {
-  cursor: pointer;
-}
-
-.hide_spectrum_bar {
-  background-color: red;
-  position: absolute;
-  top: 0%;
-  right: 0%;
-  width: 30px;
-  height: 30px;
-  opacity: 0.5;
-  z-index: 9999998;
-  cursor: pointer;
-}
-
 /* スピナー ここから拝借 https://loading.io/css/*/
 #spinner {
   transition: 0.1s;

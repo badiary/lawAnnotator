@@ -1,156 +1,20 @@
-import React, { useRef, useEffect, useState } from "react";
-import * as satModules from "./sat";
+import { SpectrumQueryInput, TextHighlighterOption } from "./spectrum";
+import { articleHighlightItems } from "./Annotator";
 
 type MenuProps = {
   dispatch: React.Dispatch<DispatchAction>;
-  sat: satModules.Sat;
   downloadLabel: () => Promise<void>;
   setTextHighlighterOption: React.Dispatch<React.SetStateAction<any>>;
   textHighlighterOption: TextHighlighterOption;
 };
+
 const Menu = (props: MenuProps) => {
-  const wordQueryEl = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    wordQueryEl.current!.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        showSpinner("ワード反転中...", 10, () => {
-          if (props.sat.word && props.sat.cv) {
-            props.sat.word.setOption(getWordOption());
-
-            props.setTextHighlighterOption({
-              ...props.sat.word.textHighlighterOption,
-              query: wordQueryEl.current!.innerText,
-            });
-            setColoredQuery();
-            wordQueryEl.current!.blur();
-          }
-        });
-
-        e.preventDefault();
-      }
+  const updateOption = (textHighlighterOption: TextHighlighterOption) => {
+    articleHighlightItems.forEach((item) => {
+      textHighlighterOption.items.unshift(item);
     });
-  }, []);
-
-  // useEffect(() => {
-  //   const query_div = wordQueryEl.current!;
-  //   query_div.innerText = props.textHighlighterOption.query;
-  //   if (query_div.innerText) {
-  //     showSpinner("ワード反転中...", 10, () => {
-  //       if (props.sat.word && props.sat.cv) {
-  //         props.sat.word.setOption(getWordOption());
-
-  //         setColoredQuery();
-  //         wordQueryEl.current!.blur();
-  //       }
-  //     });
-  //   }
-  // }, []);
-
-  /**
-   * #word_query内に入力されたクエリからワード反転のオプションを生成
-   * @return {object} satオブジェクトに渡すワード反転のオプション
-   */
-  function getWordOption() {
-    const query = wordQueryEl
-      .current!.innerText.trim()
-      .replace(/[\r\n]+/g, " ");
-    if (query === "" || /^\s+$/.test(query)) {
-      return {};
-    }
-
-    const word_arr: string[][] = query.split(/\s+/).map((word) => {
-      const slash_match = word.match(/(^\/|[^\\]\/|\/$)/g);
-      if (
-        slash_match &&
-        slash_match.length > 0 &&
-        slash_match.length % 2 === 0
-      ) {
-        // クエリの最小単位を求める再帰関数（先頭から順に最小単位を切り取っていく）
-
-        return getQueryUnitArr(word, []);
-      } else {
-        return word.split(/[+＋]/g);
-      }
-    });
-
-    // 反転ワード情報を更新
-    const colors = props.sat.word!.getWordColors(word_arr.length);
-
-    const word_option: { [color_id: string]: satModules.WordOption } = {};
-    word_arr.forEach((words: string[], i: number) => {
-      words.forEach((word: string) => {
-        if (!word_option[i]) {
-          word_option[i] = { words: [], color: "" };
-        }
-        if (word.substr(0, 1) !== "/") {
-          word_option[i]!.words.push(word.replace(/_/g, " "));
-        } else {
-          word_option[i]!.words.push(word);
-        }
-
-        word_option[i]!.color = colors[i]!;
-      });
-    });
-
-    return word_option;
-  }
-
-  function getQueryUnitArr(word: string, acc: string[]): string[] {
-    if (word.substr(0, 1) !== "/") {
-      // 先頭は正規表現でない -> 最先の+を見つけてそこで区切る
-      const pos_plus = word.indexOf("+");
-      if (pos_plus === -1) {
-        acc.push(word);
-        return acc;
-      } else {
-        acc.push(word.substring(0, pos_plus));
-        return getQueryUnitArr(word.substring(pos_plus + 1), acc);
-      }
-    } else {
-      // 先頭は正規表現 -> 最先の/（ただし\/は除外）を見つけてそこで区切る
-      const mt = word.match(/[^\\]\/[dgimsuy]*/)!;
-      if (!mt) return acc; // 何かがおかしい
-      acc.push(word.substring(0, mt.index! + mt[0]!.length));
-
-      if (word.length === mt.index! + mt[0]!.length) {
-        return acc;
-      } else {
-        return getQueryUnitArr(
-          word.substring(mt.index! + mt[0]!.length + 1),
-          acc
-        );
-      }
-    }
-  }
-
-  /**
-   * #word_query内に、キーワードを各反転色で反転させたHTMLをセット
-   */
-  function setColoredQuery() {
-    const query_div = wordQueryEl.current!;
-    query_div.innerHTML = "";
-
-    Object.keys(props.sat.word!.option).forEach((color_id) => {
-      props.sat.word!.option[color_id]!.words.forEach(
-        (word: string, j: number) => {
-          const span = document.createElement("span");
-          span.innerText = word.replace(/ /g, "_");
-          span.setAttribute("mode", "word_inversion");
-          span.setAttribute("color_id", color_id);
-          span.classList.add("query_unit");
-          span.classList.add(`word_inversion_class${color_id}`);
-
-          query_div.appendChild(span);
-          if (j !== props.sat.word!.option[color_id]!.words.length - 1) {
-            query_div.appendChild(document.createTextNode("+"));
-          }
-        }
-      );
-      query_div.appendChild(document.createTextNode(" "));
-    });
-  }
-
+    props.setTextHighlighterOption(textHighlighterOption);
+  };
   return (
     <div id="Menu">
       <ul>
@@ -197,12 +61,10 @@ const Menu = (props: MenuProps) => {
 
         <li className="blank"></li>
         <li>
-          <div
-            id="word_query"
-            contentEditable="true"
-            placeholder="反転ワードを入力...(Ctrl+Shift+F)"
-            ref={wordQueryEl}
-          ></div>
+          <SpectrumQueryInput
+            setTextHighlighterOption={updateOption}
+            textHighlighterOption={props.textHighlighterOption}
+          />
         </li>
       </ul>
     </div>
@@ -210,17 +72,3 @@ const Menu = (props: MenuProps) => {
 };
 
 export default Menu;
-
-function showSpinner(message: string, msec: number, exec_func: any) {
-  document.getElementById("loading_message")!.innerHTML = message;
-  const spinner = document.getElementById("spinner")!;
-  spinner.classList.add("visible");
-  new Promise((resolve, reject) => {
-    setTimeout(() => {
-      exec_func();
-      resolve(null);
-    }, msec);
-  }).then(() => {
-    spinner.classList.remove("visible");
-  });
-}

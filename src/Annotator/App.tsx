@@ -1,7 +1,6 @@
 import React, { useState, useEffect, createContext } from "react";
 import Annotator from "./Annotator";
 import { kanji2number } from "@geolonia/japanese-numeral";
-import * as satModules from "./sat";
 
 // @ts-ignore
 export const LawContext = createContext<Law>({});
@@ -43,7 +42,6 @@ const lawInfo: {
 function App() {
   const [law, setLaw] = useState<Law>({ info: lawInfo, content: {} });
   const [loadingLaw, setLoadingLaw] = useState(true);
-  const sat = new satModules.Sat();
 
   useEffect(() => {
     async function getLaw() {
@@ -52,7 +50,6 @@ function App() {
       }
       newLaw.content["epc"] = await getEPLaw();
       setLaw(newLaw);
-      console.log({ newLaw });
       setLoadingLaw(false);
     }
     const newLaw = { ...law };
@@ -77,7 +74,7 @@ function App() {
             </div>
           </div>
 
-          <Annotator sat={sat} />
+          <Annotator />
         </LawContext.Provider>
       )}
     </>
@@ -325,7 +322,7 @@ const getEPLaw = async () => {
 // 以下、対訳HTMLのパース用関数
 const cleanChapter = (chapterEl: HTMLElement, index: number): ChapterXML => {
   const chapter: any = {};
-  chapter.$ = { num: index + 1 };
+  chapter.$ = { Num: index + 1 };
   chapter.ChapterTitle = (
     chapterEl.querySelector("div.ChapterTitle") as HTMLElement
   ).innerText;

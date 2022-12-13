@@ -6,34 +6,75 @@ import React, {
   useState,
 } from "react";
 import { LawContext } from "./App";
-import JPTextAnnotator from "./JPTextAnnotator";
 import { Container, Row, Col } from "react-bootstrap";
 import Button from "react-bootstrap/Button";
 import ButtonGroup from "react-bootstrap/ButtonGroup";
-import JPFullText from "./JPFullText";
-import EPFullText from "./EPFullText";
 import Menu from "./Menu";
-import hotkeys from "hotkeys-js";
-import { kanji2number } from "@geolonia/japanese-numeral";
-import * as satModules from "./sat";
-import EPTextAnnotator from "./EPTextAnnotator";
+import { SpectrumCanvas, TextHighlighterOption } from "./spectrum";
+import FullText from "./FullText";
+import TextAnnotator from "./TextAnnotatorContainer";
+export const articleHighlightItems = [];
+// export const articleHighlightItems = [
+//   {
+//     word: "((?:第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*(?:第[〇一二三四五六七八九十百]項)?(?:第[〇一二三四五六七八九十百]号)?)|(?:前[条項号](?:第[〇一二三四五六七八九十百][項号])*))",
+//     style: { color: "green" },
+//     callback: (text: string) => {
+//       return (
+//         <a
+//           href="#1"
+//           onClick={(e) => {
+//             const articleTerm = text.match(
+//               /第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*/
+//             );
+//             if (articleTerm) {
+//               document
+//                 .getElementById(
+//                   `article${articleTerm[0]
+//                     .match(/[〇一二三四五六七八九十百]+/g)!
+//                     .map(kanji2number)
+//                     .join("_")}`
+//                 )
+//                 ?.scrollIntoView();
+//             }
+//           }}
+//         >
+//           {text}
+//         </a>
+//       );
+//     },
+//   },
+//   {
+//     word: "article [0-9]+[a-z]*",
+//     style: { color: "green" },
+//   },
+// ];
 
-type AnnotatorProps = {
-  sat: satModules.Sat;
-};
-function Annotator(props: AnnotatorProps) {
+export interface CommonProps {
+  selectedLaw: string;
+  targetedArticleNum?: string;
+  relation: {
+    [articleNum: string]: Set<string>;
+  };
+  dispatch: React.Dispatch<DispatchAction>;
+  textHighlighterOption: TextHighlighterOption;
+}
+
+// type AnnotatorProps = {};
+function Annotator() {
   console.log("rendering Annotator");
   const law = useContext<Law>(LawContext);
 
   const [textHighlighterOption, setTextHighlighterOption] =
     useState<TextHighlighterOption>({
-      words: [],
-      className: {},
+      items: articleHighlightItems,
       query: "",
+      coloredQuery: "",
+      colorIndex: {},
     });
 
   const [lawStates, dispatch] = useReducer(reducer, getInitialLawStates(law));
   const [selectedLaw, setSelectedLaw] = useState("jpPatent");
+  const [isLoaded, setIsLoaded] = useState(false);
 
   function reducer(
     lawStates: { [lawName: string]: LawState },
@@ -193,55 +234,6 @@ function Annotator(props: AnnotatorProps) {
   }
 
   const fulltextEl = useRef<HTMLDivElement>(null);
-  const targetedArticleEl = useRef<HTMLDivElement>(null);
-  const labeledArticleEl = useRef<HTMLDivElement>(null);
-  const textAnnotatorEls = useRef({
-    targetedArticleEl,
-    labeledArticleEl,
-  });
-  useEffect(() => {
-    Array.from(document.querySelectorAll("canvas")).forEach((cv) => {
-      cv.parentNode?.removeChild(cv);
-    });
-    Array.from(document.querySelectorAll(".hide_spectrum_bar")).forEach(
-      (div) => {
-        div.parentNode?.removeChild(div);
-      }
-    );
-    props.sat.initialize(
-      [
-        [fulltextEl.current!, "visible"],
-        [targetedArticleEl.current!, "hidden"],
-        [labeledArticleEl.current!, "hidden"],
-      ],
-      0.5,
-      true,
-      false
-    );
-    props.sat.word!.setOption({});
-    setTextHighlighterOption({
-      ...props.sat.word!.textHighlighterOption,
-      query: "",
-    });
-    props.sat.cv!.draw();
-
-    hotkeys("command+shift+f", (event: Event, _handler: any) => {
-      event.preventDefault();
-      function setCaretToEnd(target: HTMLElement) {
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(target);
-        range.collapse(false);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-        target.focus();
-        range.detach();
-      }
-      const div = document.getElementById("word_query")!;
-      div.click();
-      setCaretToEnd(div);
-    });
-  }, [selectedLaw]);
 
   const downloadLabel = async () => {
     const data = {
@@ -294,53 +286,44 @@ function Annotator(props: AnnotatorProps) {
   };
 
   useEffect(() => {
-    if (props.sat.cv) {
-      props.sat.cv.updateData();
-      props.sat.cv.draw();
-    } else {
-      console.log("no sat cv!");
-      console.log(props.sat);
-    }
-  }, [textHighlighterOption, selectedLaw]);
+    setIsLoaded(true);
+  }, []);
 
   return (
     <Container id="main">
       <Row id="title">
         <Col>
-          <h4>
-            <ButtonGroup aria-label="Basic example">
-              {Object.entries(law.info).map(([key, val]) => {
-                if (key === selectedLaw) {
-                  return (
-                    <Button key={key} variant="primary">
-                      {val.name}
-                    </Button>
-                  );
-                } else {
-                  return (
-                    <Button
-                      key={key}
-                      data-key={key}
-                      variant="light"
-                      onClick={(e) => {
-                        const clickedKey = (
-                          e.target as HTMLButtonElement
-                        ).attributes.getNamedItem("data-key")!.value;
-                        setSelectedLaw(clickedKey);
-                      }}
-                    >
-                      {val.name}
-                    </Button>
-                  );
-                }
-              })}
-            </ButtonGroup>
-          </h4>
+          <ButtonGroup aria-label="Basic example">
+            {Object.entries(law.info).map(([key, val]) => {
+              if (key === selectedLaw) {
+                return (
+                  <Button key={key} variant="primary">
+                    {val.name}
+                  </Button>
+                );
+              } else {
+                return (
+                  <Button
+                    key={key}
+                    data-key={key}
+                    variant="light"
+                    onClick={(e) => {
+                      const clickedKey = (
+                        e.target as HTMLButtonElement
+                      ).attributes.getNamedItem("data-key")!.value;
+                      setSelectedLaw(clickedKey);
+                    }}
+                  >
+                    {val.name}
+                  </Button>
+                );
+              }
+            })}
+          </ButtonGroup>
         </Col>
         <Col>
           <Menu
             dispatch={dispatch}
-            sat={props.sat}
             downloadLabel={downloadLabel}
             setTextHighlighterOption={setTextHighlighterOption}
             textHighlighterOption={textHighlighterOption}
@@ -350,63 +333,47 @@ function Annotator(props: AnnotatorProps) {
       <Row id="lawViewer">
         <Container>
           <Row className="oneRow">
-            <Col className="col-6" ref={fulltextEl}>
-              {(selectedLaw === "jpPatent" || selectedLaw === "jpUtil") && (
-                <JPFullText
-                  selectedLaw={selectedLaw}
-                  targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
-                  relation={
-                    lawStates[selectedLaw].targetedArticleNum
-                      ? lawStates[selectedLaw].relation[
-                          lawStates[selectedLaw].targetedArticleNum!
-                        ]
-                      : new Set<string>()
+            <Col
+              className="col-6"
+              ref={fulltextEl}
+              style={{ position: "relative" }}
+            >
+              <FullText
+                selectedLaw={selectedLaw}
+                targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
+                relatedArticleNumSet={
+                  lawStates[selectedLaw].targetedArticleNum
+                    ? lawStates[selectedLaw].relation[
+                        lawStates[selectedLaw].targetedArticleNum!
+                      ]
+                    : new Set<string>()
+                }
+                dispatch={dispatch}
+                textHighlighterOption={textHighlighterOption}
+              />
+
+              {isLoaded && (
+                <SpectrumCanvas
+                  initialVisibility="visible"
+                  parentContainer={fulltextEl.current}
+                  childContainer={
+                    fulltextEl.current?.children[0] as HTMLElement
                   }
-                  dispatch={dispatch}
-                  textHighlighterOption={textHighlighterOption}
-                />
-              )}
-              {selectedLaw === "epc" && (
-                <EPFullText
                   selectedLaw={selectedLaw}
-                  targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
-                  relation={
-                    lawStates[selectedLaw].targetedArticleNum
-                      ? lawStates[selectedLaw].relation[
-                          lawStates[selectedLaw].targetedArticleNum!
-                        ]
-                      : new Set<string>()
-                  }
-                  dispatch={dispatch}
                   textHighlighterOption={textHighlighterOption}
-                />
+                ></SpectrumCanvas>
               )}
             </Col>
             <Col>
-              {(selectedLaw === "jpPatent" || selectedLaw === "jpUtil") && (
-                <JPTextAnnotator
-                  selectedLaw={selectedLaw}
-                  targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
-                  pairedArticleNum={lawStates[selectedLaw].pairedArticleNum}
-                  relation={lawStates[selectedLaw].relation}
-                  textLabel={lawStates[selectedLaw].textLabel}
-                  dispatch={dispatch}
-                  textHighlighterOption={textHighlighterOption}
-                  ref={textAnnotatorEls}
-                />
-              )}
-              {selectedLaw === "epc" && (
-                <EPTextAnnotator
-                  selectedLaw={selectedLaw}
-                  targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
-                  pairedArticleNum={lawStates[selectedLaw].pairedArticleNum}
-                  relation={lawStates[selectedLaw].relation}
-                  textLabel={lawStates[selectedLaw].textLabel}
-                  dispatch={dispatch}
-                  textHighlighterOption={textHighlighterOption}
-                  ref={textAnnotatorEls}
-                />
-              )}
+              <TextAnnotator
+                selectedLaw={selectedLaw}
+                targetedArticleNum={lawStates[selectedLaw].targetedArticleNum}
+                pairedArticleNum={lawStates[selectedLaw].pairedArticleNum}
+                relation={lawStates[selectedLaw].relation}
+                textLabel={lawStates[selectedLaw].textLabel}
+                dispatch={dispatch}
+                textHighlighterOption={textHighlighterOption}
+              />
             </Col>
           </Row>
         </Container>
@@ -462,142 +429,4 @@ export const getArticleStatus = (
     return "labeled";
   }
   return "none";
-};
-
-type TextToHighlighterProps = {
-  text: string;
-  textHighlighterOption: TextHighlighterOption;
-};
-export const TextHighlighter = (props: TextToHighlighterProps) => {
-  const chunks: { text: string; className: string }[] =
-    props.textHighlighterOption.words.reduce(
-      // 反転ワード毎にループ
-      (prev: { text: string; className: string }[], currentWord) => {
-        return prev
-          .map(({ text, className }) => {
-            // chunk毎にループ
-            // 既にヒット済みのchunkなら無視
-            if (className !== "") {
-              return [{ text, className }];
-            }
-
-            // 正規表現のマッチ情報を元にtextの分割位置を取得
-            let match: RegExpExecArray | null;
-            const re = new RegExp(currentWord, "g");
-            const matchedRanges: { start: number; end: number }[] = [];
-            while ((match = re.exec(text))) {
-              const start = match.index;
-              const end = re.lastIndex;
-
-              if (end > start) {
-                matchedRanges.push({
-                  start,
-                  end,
-                });
-              }
-              if (match.index === re.lastIndex) {
-                re.lastIndex++;
-              }
-            }
-
-            // マッチ部分がなければチャンクそのまま返す
-            if (matchedRanges.length === 0) {
-              return [{ text: text, className: "" }];
-            }
-
-            // 取得したマッチ位置でテキストを分割し、クラス名もついでに付与
-            const { chunks, index } = matchedRanges.reduce(
-              (
-                prev: {
-                  chunks: { text: string; className: string }[];
-                  index: number;
-                },
-                currentRange,
-                i
-              ) => {
-                // 現在のマッチ位置以前にヒットしなかったchunkがある場合、追加しておく
-                if (currentRange.start > prev.index) {
-                  prev.chunks.push({
-                    text: text.slice(prev.index, currentRange.start),
-                    className: "",
-                  });
-                }
-
-                // マッチしたchunkを追加する
-                prev.chunks.push({
-                  text: text.slice(currentRange.start, currentRange.end),
-                  className: props.textHighlighterOption.className[currentWord],
-                });
-                prev.index = currentRange.end;
-
-                // 現在のマッチ以後にヒットしなかったchunkがあって、これが最後のマッチ位置の場合場、追加しておく
-                if (
-                  i === matchedRanges.length - 1 &&
-                  currentRange.end < text.length
-                ) {
-                  prev.chunks.push({
-                    text: text.slice(currentRange.end),
-                    className: "",
-                  });
-                }
-                return prev;
-              },
-              {
-                chunks: [],
-                index: 0,
-              }
-            );
-
-            return chunks;
-          })
-          .flat();
-      },
-      [{ text: props.text, className: "" }]
-    );
-
-  return (
-    <>
-      {chunks.map((chunk, i) => {
-        if (chunk.className === "") {
-          return <span key={i}>{chunk.text}</span>;
-        } else {
-          if (chunk.className === "articleWord") {
-            return (
-              <a
-                href="#1"
-                key={i}
-                onClick={(e) => {
-                  const articleTerm = chunk.text.match(
-                    /第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*/
-                  );
-                  if (articleTerm) {
-                    document
-                      .getElementById(
-                        `article${articleTerm[0]
-                          .match(/[〇一二三四五六七八九十百]+/g)!
-                          .map(kanji2number)
-                          .join("_")}`
-                      )
-                      ?.scrollIntoView();
-                  }
-                }}
-              >
-                {chunk.text}
-              </a>
-            );
-          } else {
-            return (
-              <span
-                key={i}
-                className={`word_inversion ${chunk.className}`}
-                // style={{ color: "", backgroundColor: "" }} // TODO styleに色を直書きしたい
-              >
-                {chunk.text}
-              </span>
-            );
-          }
-        }
-      })}
-    </>
-  );
 };
