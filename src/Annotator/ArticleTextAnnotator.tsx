@@ -4,6 +4,7 @@ import { TextAnnotateMulti } from "@badiary/react-text-annotate-multi";
 import { ArticleMenu, Item, ParagraphSentence } from "./FullTextJP";
 import { getBackgroungColor } from "./TextAnnotatorContainer";
 import { CommonProps } from "./Annotator";
+import { getJSXElement } from "./FullTextEP";
 
 interface SentenceAnnotatorGeneratorProps
   extends Omit<CommonProps, "relation"> {
@@ -23,104 +24,114 @@ interface ArticleTextAnnotatorJPProps extends SentenceAnnotatorGeneratorProps {
   article: ArticleXML;
   articleStatus: ArticleStatus;
 }
-// TODO memo?
-export const ArticleTextAnnotatorJP = (props: ArticleTextAnnotatorJPProps) => {
-  const [showMenu, setShowMenu] = useState(false);
-  const menuTarget = useRef(null);
-  const { article, articleStatus, ...sentenceAnnotatorGeneratorProps } = props;
-  const sentenceGenerator = getSentenceGenerator(
-    sentenceAnnotatorGeneratorProps
-  );
 
-  let className = "";
-  if (props.articleStatus === "target") {
-    className += " TOCArticleTargeted";
-  } else if (props.articleStatus === "paired") {
-    className += " articlePaired";
-  }
+export const ArticleTextAnnotatorJP = memo(
+  (props: ArticleTextAnnotatorJPProps) => {
+    const [showMenu, setShowMenu] = useState(false);
+    const menuTarget = useRef(null);
+    const { article, articleStatus, ...sentenceAnnotatorGeneratorProps } =
+      props;
+    const sentenceGenerator = getSentenceGenerator(
+      sentenceAnnotatorGeneratorProps
+    );
 
-  return (
-    <div id={`article${props.article.$.Num}`} className={`article${className}`}>
-      <div>
-        {/* キャプション */}
-        <div className="articleCaption">
-          <TextHighlighter
-            text={props.article.ArticleCaptionEn!}
-            textHighlighterOption={props.textHighlighterOption}
-          ></TextHighlighter>
-        </div>
+    let className = "";
+    if (props.articleStatus === "target") {
+      className += " TOCArticleTargeted";
+    } else if (props.articleStatus === "paired") {
+      className += " articlePaired";
+    }
 
-        {/* 以下、条文の内容 最初のParagraphとそれ以降で分けて考える*/}
+    return (
+      <div
+        id={`article${props.article.$.Num}`}
+        className={`article${className}`}
+      >
+        <div>
+          {/* キャプション */}
+          <div className="articleCaption">
+            <TextHighlighter
+              text={props.article.ArticleCaptionEn!}
+              textHighlighterOption={props.textHighlighterOption}
+            ></TextHighlighter>
+          </div>
 
-        {/* まずは最初のParagraph */}
-        <div className="paragraphBlock">
-          <span
-            className="articleTitle text-primary"
-            ref={menuTarget}
-            onClick={() => setShowMenu(!showMenu)}
-          >
-            {props.article.ArticleTitleEn}
-          </span>
-          <ArticleMenu
-            selectedLaw={props.selectedLaw}
-            target={menuTarget.current}
-            showMenu={showMenu}
-            setShowMenu={setShowMenu}
-            articleNum={props.article.$.Num}
-            dispatch={props.dispatch}
-          ></ArticleMenu>
+          {/* 以下、条文の内容 最初のParagraphとそれ以降で分けて考える*/}
 
-          <ParagraphSentence
-            paragraphSentence={props.article.Paragraph[0]!.ParagraphSentenceEn}
-            lang="en"
-            sentenceGenerator={sentenceGenerator}
-          ></ParagraphSentence>
+          {/* まずは最初のParagraph */}
+          <div className="paragraphBlock">
+            <span
+              className="articleTitle text-primary"
+              ref={menuTarget}
+              onClick={() => setShowMenu(!showMenu)}
+            >
+              {props.article.ArticleTitleEn}
+            </span>
+            <ArticleMenu
+              selectedLaw={props.selectedLaw}
+              target={menuTarget.current}
+              showMenu={showMenu}
+              setShowMenu={setShowMenu}
+              articleNum={props.article.$.Num}
+              dispatch={props.dispatch}
+            ></ArticleMenu>
 
-          {props.article.Paragraph[0]!.Item.map((item: ItemXML, i: number) => {
-            return (
-              <Item
-                key={i}
-                item={item}
-                lang="en"
-                sentenceGenerator={sentenceGenerator}
-              ></Item>
-            );
-          })}
-        </div>
+            <ParagraphSentence
+              paragraphSentence={
+                props.article.Paragraph[0]!.ParagraphSentenceEn
+              }
+              lang="en"
+              sentenceGenerator={sentenceGenerator}
+            ></ParagraphSentence>
 
-        {/* ２番目以降のParagraph */}
-        {props.article.Paragraph.length > 1 &&
-          props.article.Paragraph.slice(1).map(
-            (paragraph: ParagraphXML, i: number) => {
-              return (
-                <div key={i} className="paragraphBlock">
-                  <span className="paragraphNum">
-                    {paragraph.ParagraphSentenceEn.$.Num}
-                  </span>
-                  <ParagraphSentence
-                    paragraphSentence={paragraph.ParagraphSentenceEn}
+            {props.article.Paragraph[0]!.Item.map(
+              (item: ItemXML, i: number) => {
+                return (
+                  <Item
+                    key={i}
+                    item={item}
                     lang="en"
                     sentenceGenerator={sentenceGenerator}
-                  ></ParagraphSentence>
+                  ></Item>
+                );
+              }
+            )}
+          </div>
 
-                  {paragraph.Item.map((item: ItemXML, i: number) => {
-                    return (
-                      <Item
-                        key={i}
-                        item={item}
-                        lang="en"
-                        sentenceGenerator={sentenceGenerator}
-                      ></Item>
-                    );
-                  })}
-                </div>
-              );
-            }
-          )}
+          {/* ２番目以降のParagraph */}
+          {props.article.Paragraph.length > 1 &&
+            props.article.Paragraph.slice(1).map(
+              (paragraph: ParagraphXML, i: number) => {
+                return (
+                  <div key={i} className="paragraphBlock">
+                    <span className="paragraphNum">
+                      {paragraph.ParagraphSentenceEn.$.Num}
+                    </span>
+                    <ParagraphSentence
+                      paragraphSentence={paragraph.ParagraphSentenceEn}
+                      lang="en"
+                      sentenceGenerator={sentenceGenerator}
+                    ></ParagraphSentence>
+
+                    {paragraph.Item.map((item: ItemXML, i: number) => {
+                      return (
+                        <Item
+                          key={i}
+                          item={item}
+                          lang="en"
+                          sentenceGenerator={sentenceGenerator}
+                        ></Item>
+                      );
+                    })}
+                  </div>
+                );
+              }
+            )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
 
 interface ArticleTextAnnotatorEPProps extends SentenceAnnotatorGeneratorProps {
   article: {
@@ -190,8 +201,7 @@ interface SentenceSimpleProps {
   sentenceID?: string;
 }
 
-// TODO memo?
-const Sentence = (props: SentenceProps) => {
+const Sentence = memo((props: SentenceProps) => {
   // console.log("rendering Sentence");
   if (!props.sentenceID) {
     return (
@@ -238,7 +248,7 @@ const Sentence = (props: SentenceProps) => {
       }}
     />
   );
-};
+});
 
 const getSentenceGenerator = (
   sentenceGeneratorProps: SentenceAnnotatorGeneratorProps
@@ -254,106 +264,4 @@ const getSentenceGenerator = (
   };
 };
 
-const getJSXElement = (
-  node: Node,
-  SentenceGenerator: (props: SentenceSimpleProps) => JSX.Element,
-  sentenceID?: string
-) => {
-  if (node.nodeType === 3) {
-    return (
-      <SentenceGenerator content={node.textContent!} sentenceID={sentenceID} />
-    );
-  } else {
-    if (node.nodeName === "BR") {
-      return <></>;
-    } else if (node.nodeName === "DL") {
-      return (
-        <dl className="epc">
-          {Array.from(node.childNodes).map((childNode, i) => {
-            return (
-              <React.Fragment key={i}>
-                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
-              </React.Fragment>
-            );
-          })}
-        </dl>
-      );
-    } else if (node.nodeName === "DT") {
-      return (
-        <dt>
-          {Array.from(node.childNodes).map((childNode, i) => {
-            return (
-              <React.Fragment key={i}>
-                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
-              </React.Fragment>
-            );
-          })}
-        </dt>
-      );
-    } else if (node.nodeName === "DD") {
-      return (
-        <dd>
-          {Array.from(node.childNodes).map((childNode, i) => {
-            return (
-              <React.Fragment key={i}>
-                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
-              </React.Fragment>
-            );
-          })}
-        </dd>
-      );
-    } else if (node.nodeName === "DIV") {
-      return (
-        <div>
-          {Array.from(node.childNodes).map((childNode, i) => {
-            return (
-              <React.Fragment key={i}>
-                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
-              </React.Fragment>
-            );
-          })}
-        </div>
-      );
-    } else if (node.nodeName === "UL") {
-      return (
-        <ul>
-          {Array.from(node.childNodes).map((childNode, i) => {
-            return (
-              <React.Fragment key={i}>
-                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
-              </React.Fragment>
-            );
-          })}
-        </ul>
-      );
-    } else if (node.nodeName === "LI") {
-      return (
-        <li>
-          {Array.from(node.childNodes).map((childNode, i) => {
-            return (
-              <React.Fragment key={i}>
-                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
-              </React.Fragment>
-            );
-          })}
-        </li>
-      );
-    } else if (node.nodeName === "SPAN") {
-      const newSentenceID = (node as Element).getAttribute("data-sentenceid")!;
-      return (
-        <span data-sentenceid={sentenceID}>
-          {Array.from(node.childNodes).map((childNode, i) => {
-            return (
-              <React.Fragment key={i}>
-                {getJSXElement(childNode, SentenceGenerator, newSentenceID)}
-              </React.Fragment>
-            );
-          })}
-        </span>
-      );
-    }
-  }
 
-  console.log("error?", node);
-  return <></>;
-};

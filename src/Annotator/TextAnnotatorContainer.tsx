@@ -276,30 +276,46 @@ function LabeledArticle(props: LabeledArticleProps) {
   );
 }
 
-// TODO! epcのソート関数
 const sortArticleNum = (
   articleNum1: string,
   articleNum2: string
 ): 1 | 0 | -1 => {
-  const nums1 = articleNum1.split("-");
-  const nums2 = articleNum2.split("-");
-  if (Number(nums1[0]) < Number(nums2[0])) {
+  console.log({ articleNum1, articleNum2 });
+  const num1 = articleNum1.match(/^[0-9]+/)![0];
+  const num2 = articleNum2.match(/^[0-9]+/)![0];
+  console.log({ num1, num2 });
+  if (Number(num1) < Number(num2)) {
     return -1;
-  } else if (Number(nums1[0]) > Number(nums2[0])) {
+  } else if (Number(num1) > Number(num2)) {
     return 1;
-  }
-  // 以下、最初の数字が同じパターン
-  if (nums1.length === 1 && nums2.length === 1) {
+  } else if (articleNum1 === articleNum2) {
     return 0;
   }
-  if (nums1.length === 1) {
-    return -1;
-  }
-  if (nums2.length === 1) {
-    return 1;
-  }
 
-  return sortArticleNum(nums1.slice(1).join("-"), nums2.slice(1).join("-"));
+  // 以下、最初の数字が同じパターン
+  console.log("JP");
+  // まずはJP
+  const nums1 = articleNum1.split("-");
+  const nums2 = articleNum2.split("-");
+
+  if (nums1.length > 1 && nums2.length > 1) {
+    return sortArticleNum(nums1.slice(1).join("-"), nums2.slice(1).join("-"));
+  }
+  if (nums1.length > 1) return 1;
+  if (nums2.length > 1) return -1;
+
+  // 次にEP
+  console.log("EP");
+  console.log({ articleNum1, articleNum2 });
+  const eng1 = articleNum1.match(/[a-z]+/);
+  const eng2 = articleNum2.match(/[a-z]+/);
+  if (!eng1) return -1;
+  if (!eng2) return 1;
+  if (eng1[0] === eng2[0]) return 0;
+  if (eng1[0] < eng2[0]) return -1;
+  if (eng1[0] > eng2[0]) return 1;
+
+  throw new Error(`sort error (${articleNum1}, ${articleNum2})`);
 };
 
 const getArticleStatus = (

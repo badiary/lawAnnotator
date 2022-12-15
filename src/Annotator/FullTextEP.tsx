@@ -3,6 +3,7 @@ import { LawContext } from "./App";
 import { CommonProps, getArticleStatus } from "./Annotator";
 import { ArticleMenu } from "./FullTextJP";
 import { TextHighlighter, TextHighlighterOption } from "./spectrum";
+import { text } from "stream/consumers";
 
 interface FullTextEPProps extends Omit<CommonProps, "relation"> {
   relatedArticleNumSet: Set<string>;
@@ -82,7 +83,7 @@ const ArticleEP = memo((props: ArticleEPProps) => {
   const contentElements = Array.from(div.childNodes).map((node, i) => {
     return (
       <React.Fragment key={i}>
-        {getJSXElement(node, props.textHighlighterOption)}
+        {getJSXElement(node, getSentenceGenerator(props.textHighlighterOption))}
       </React.Fragment>
     );
   });
@@ -136,7 +137,7 @@ export const ArticleEPJA = memo((props: ArticleEPJAProps) => {
   const contentElements = Array.from(div.childNodes).map((node, i) => {
     return (
       <React.Fragment key={i}>
-        {getJSXElement(node, props.textHighlighterOption)}
+        {getJSXElement(node, getSentenceGenerator(props.textHighlighterOption))}
       </React.Fragment>
     );
   });
@@ -154,17 +155,30 @@ export const ArticleEPJA = memo((props: ArticleEPJAProps) => {
   );
 });
 
-// TODO 将来的にはsentene generatorを渡したい
-const getJSXElement = (
+interface SentenceSimpleProps {
+  content: string;
+  sentenceID?: string;
+}
+
+const getSentenceGenerator = (textHighlighterOption: TextHighlighterOption) => {
+  return (props: SentenceSimpleProps) => {
+    return (
+      <TextHighlighter
+        text={props.content}
+        textHighlighterOption={textHighlighterOption}
+      />
+    );
+  };
+};
+
+export const getJSXElement = (
   node: Node,
-  textHighlighterOption: TextHighlighterOption
+  SentenceGenerator: (props: SentenceSimpleProps) => JSX.Element,
+  sentenceID?: string
 ) => {
   if (node.nodeType === 3) {
     return (
-      <TextHighlighter
-        text={node.textContent!}
-        textHighlighterOption={textHighlighterOption}
-      ></TextHighlighter>
+      <SentenceGenerator content={node.textContent!} sentenceID={sentenceID} />
     );
   } else {
     if (node.nodeName === "BR") {
@@ -175,7 +189,7 @@ const getJSXElement = (
           {Array.from(node.childNodes).map((childNode, i) => {
             return (
               <React.Fragment key={i}>
-                {getJSXElement(childNode, textHighlighterOption)}
+                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
               </React.Fragment>
             );
           })}
@@ -187,7 +201,7 @@ const getJSXElement = (
           {Array.from(node.childNodes).map((childNode, i) => {
             return (
               <React.Fragment key={i}>
-                {getJSXElement(childNode, textHighlighterOption)}
+                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
               </React.Fragment>
             );
           })}
@@ -196,17 +210,13 @@ const getJSXElement = (
     } else if (node.nodeName === "DD") {
       return (
         <dd>
-          <span
-            data-sentenceid={(node as Element).getAttribute("data-sentenceid")}
-          >
-            {Array.from(node.childNodes).map((childNode, i) => {
-              return (
-                <React.Fragment key={i}>
-                  {getJSXElement(childNode, textHighlighterOption)}
-                </React.Fragment>
-              );
-            })}
-          </span>
+          {Array.from(node.childNodes).map((childNode, i) => {
+            return (
+              <React.Fragment key={i}>
+                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
+              </React.Fragment>
+            );
+          })}
         </dd>
       );
     } else if (node.nodeName === "DIV") {
@@ -215,7 +225,7 @@ const getJSXElement = (
           {Array.from(node.childNodes).map((childNode, i) => {
             return (
               <React.Fragment key={i}>
-                {getJSXElement(childNode, textHighlighterOption)}
+                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
               </React.Fragment>
             );
           })}
@@ -227,7 +237,7 @@ const getJSXElement = (
           {Array.from(node.childNodes).map((childNode, i) => {
             return (
               <React.Fragment key={i}>
-                {getJSXElement(childNode, textHighlighterOption)}
+                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
               </React.Fragment>
             );
           })}
@@ -236,28 +246,23 @@ const getJSXElement = (
     } else if (node.nodeName === "LI") {
       return (
         <li>
-          <span
-            data-sentenceid={(node as Element).getAttribute("data-sentenceid")}
-          >
-            {Array.from(node.childNodes).map((childNode, i) => {
-              return (
-                <React.Fragment key={i}>
-                  {getJSXElement(childNode, textHighlighterOption)}
-                </React.Fragment>
-              );
-            })}
-          </span>
-        </li>
-      );
-    } else if (node.nodeName === "SPAN") {
-      return (
-        <span
-          data-sentenceid={(node as Element).getAttribute("data-sentenceid")}
-        >
           {Array.from(node.childNodes).map((childNode, i) => {
             return (
               <React.Fragment key={i}>
-                {getJSXElement(childNode, textHighlighterOption)}
+                {getJSXElement(childNode, SentenceGenerator, sentenceID)}
+              </React.Fragment>
+            );
+          })}
+        </li>
+      );
+    } else if (node.nodeName === "SPAN") {
+      const newSentenceID = (node as Element).getAttribute("data-sentenceid")!;
+      return (
+        <span data-sentenceid={sentenceID}>
+          {Array.from(node.childNodes).map((childNode, i) => {
+            return (
+              <React.Fragment key={i}>
+                {getJSXElement(childNode, SentenceGenerator, newSentenceID)}
               </React.Fragment>
             );
           })}
@@ -269,3 +274,4 @@ const getJSXElement = (
   console.log("error?", node);
   return <></>;
 };
+

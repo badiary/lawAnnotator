@@ -13,41 +13,59 @@ import Menu from "./Menu";
 import { SpectrumCanvas, TextHighlighterOption } from "./spectrum";
 import FullText from "./FullText";
 import TextAnnotator from "./TextAnnotatorContainer";
-export const articleHighlightItems = [];
-// export const articleHighlightItems = [
-//   {
-//     word: "((?:第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*(?:第[〇一二三四五六七八九十百]項)?(?:第[〇一二三四五六七八九十百]号)?)|(?:前[条項号](?:第[〇一二三四五六七八九十百][項号])*))",
-//     style: { color: "green" },
-//     callback: (text: string) => {
-//       return (
-//         <a
-//           href="#1"
-//           onClick={(e) => {
-//             const articleTerm = text.match(
-//               /第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*/
-//             );
-//             if (articleTerm) {
-//               document
-//                 .getElementById(
-//                   `article${articleTerm[0]
-//                     .match(/[〇一二三四五六七八九十百]+/g)!
-//                     .map(kanji2number)
-//                     .join("_")}`
-//                 )
-//                 ?.scrollIntoView();
-//             }
-//           }}
-//         >
-//           {text}
-//         </a>
-//       );
-//     },
-//   },
-//   {
-//     word: "article [0-9]+[a-z]*",
-//     style: { color: "green" },
-//   },
-// ];
+import { kanji2number } from "@geolonia/japanese-numeral";
+// export const articleHighlightItems = [];
+export const articleHighlightItems = [
+  {
+    word: "((?:第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*(?:第[〇一二三四五六七八九十百]項)?(?:第[〇一二三四五六七八九十百]号)?)|(?:前[条項号](?:第[〇一二三四五六七八九十百][項号])*))",
+    style: { color: "blue", textDecoration: "underline", cursor: "pointer" },
+    callback: (text: string) => {
+      return (
+        <span
+          onClick={(e) => {
+            const articleTerm = text.match(
+              /第[〇一二三四五六七八九十百]+条(?:の[〇一二三四五六七八九十百]+)*/
+            );
+            if (!articleTerm) return;
+            const articleDiv = document.getElementById(
+              `article${articleTerm[0]
+                .match(/[〇一二三四五六七八九十百]+/g)!
+                .map(kanji2number)
+                .join("_")}`
+            );
+            if (!articleDiv) return;
+            document
+              .getElementById("fulltext")!
+              .scrollTo(
+                0,
+                articleDiv.getBoundingClientRect().y! +
+                  document.getElementById("fulltext")!.scrollTop -
+                  50
+              );
+          }}
+        >
+          {text}
+        </span>
+      );
+    },
+  },
+  {
+    word: "articles? [0-9]+[a-z]*",
+    style: { color: "green" },
+  },
+  {
+    word: "第[0-9]+[a-z]*条",
+    style: { color: "green" },
+  },
+  {
+    word: "paragraphs? [0-9]( \\([a-z]\\))?",
+    style: { color: "green" },
+  },
+  {
+    word: "\\([^\\)]+\\)",
+    style: { color: "green" },
+  },
+];
 
 export interface CommonProps {
   selectedLaw: string;

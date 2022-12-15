@@ -19,7 +19,11 @@ export const getTextHighlighterOption = (
     } else {
       // 先頭は正規表現 -> 最先の/（ただし\/は除外）を見つけてそこで区切る
       const mt = word.match(/[^\\]\/[dgimsuy]*/)!;
-      if (!mt) return acc; // 何かがおかしい
+      if (!mt) {
+        console.log("word re error", word);
+        return acc; // 何かがおかしい
+      }
+
       acc.push(word.substring(0, mt.index! + mt[0]!.length));
 
       if (word.length === mt.index! + mt[0]!.length) {
@@ -80,9 +84,9 @@ export const getTextHighlighterOption = (
           item.word.replace(/_/g, " ");
         }
         if (/^\/.*\/$/.test(word)) {
-          word = word.slice(1, -1); // 前後のスラッシュを削除
+          item.word = item.word.slice(1, -1); // 前後のスラッシュを削除
         } else {
-          word = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // メタ文字をエスケープ
+          item.word = item.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // メタ文字をエスケープ
         }
         prev.items.push(item);
       });
@@ -139,7 +143,14 @@ export const TextHighlighter = (props: TextHighlighterProps) => {
 
           // 正規表現のマッチ情報を元にtextの分割位置を取得
           let match: RegExpExecArray | null;
-          const re = new RegExp(currentItem.word, "gi");
+          let re: RegExp;
+          try {
+            re = new RegExp(currentItem.word, "gi");
+          } catch (error) {
+            console.log("RegExp error", currentItem.word);
+            re = new RegExp("nomatchnomatchnomatch!!!", "gi");
+          }
+
           const matchedRanges: { start: number; end: number }[] = [];
           while ((match = re.exec(text))) {
             const start = match.index;
@@ -634,6 +645,7 @@ export const SpectrumQueryInput = (props: SpectrumQueryInputProps) => {
           const option = getTextHighlighterOption(
             queryInputEl.current!.innerText
           );
+          console.log(option.items);
           props.setTextHighlighterOption(option);
         });
         e.preventDefault();

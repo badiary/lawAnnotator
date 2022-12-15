@@ -201,6 +201,10 @@ const getEPLaw = async () => {
   const result_en = await fetch(lawInfo["epc"].path.en!);
   const epc_html = document.createElement("div");
   epc_html.innerHTML = await result_en.text();
+
+  const articleJSON: {
+    [articleNum: string]: { [sentenceID: string]: string };
+  } = {};
   const enArr = Array.from(epc_html.querySelectorAll(".pagebody")).map(
     (art) => {
       let [articleTitle, articleCaption] = (
@@ -209,36 +213,47 @@ const getEPLaw = async () => {
         .trim()
         .split("<br>");
       const articleNum = articleTitle.split("&nbsp;")[1].split("<")[0];
+      articleJSON[articleNum] = {};
       articleCaption = articleCaption.replace("\n", "").replace(/\s+/g, " ");
 
       // 以下、content
       let content = "";
       if (art.querySelector("div.LMNormal")) {
         // 箇条書きがない条文の場合
-        content = `<span data-sentenceid="${articleNum}-all">${(
+        const sentenceID = `${articleNum}-${Object.keys(
+          articleJSON[articleNum]
+        ).length.toString()}`;
+        const text = `${(
           art.querySelector("div.LMNormal")! as HTMLElement
         ).innerText
           .replace(/\s+/g, " ")
           .replace(/\[ [0-9+] \]/, " ")
           .replace(/\s+/g, " ")
-          .trim()}</span>`;
+          .trim()}`;
+        content = `<span data-sentenceid="${sentenceID}">${text}</span>`;
+        articleJSON[articleNum][sentenceID] = text;
       }
       if (art.querySelector("div.DOC4NET2_LMNormal_spc")) {
         // 箇条書きの条文の場合
-        content = Array.from(
+        content += Array.from(
           art.querySelectorAll("div.DOC4NET2_LMNormal_spc")
         ).reduce((prev: HTMLDListElement, cur: Element) => {
           if (cur.querySelector("div.DOC4NET2_pos_LMNormal_2")) {
-            const div = document.createElement("div");
-            div.innerText = (
+            const sentenceID = `${articleNum}-${Object.keys(
+              articleJSON[articleNum]
+            ).length.toString()}`;
+            const text = (
               cur.querySelector("div.DOC4NET2_pos_LMNormal_2") as HTMLElement
             ).innerText
               .replace(/\s+/g, " ")
               .replace(/\[ [0-9+] \]/, " ")
               .replace(/\s+/g, " ")
               .trim();
-            div.setAttribute("data-sentenceid", `${articleNum}-LMNormal2`);
+            const div = document.createElement("div");
+            div.innerText = text;
+            div.setAttribute("data-sentenceid", sentenceID);
             prev.appendChild(div);
+            articleJSON[articleNum][sentenceID] = text;
             return prev;
           }
 
@@ -252,12 +267,16 @@ const getEPLaw = async () => {
           dt.innerText = dtNum;
           const dd = document.createElement("dd");
           const span = document.createElement("span");
-          span.innerText = ddContent
+          const text = ddContent
             .replace(/\s+/g, " ")
             .replace(/\[ [0-9+] \]/, " ")
             .replace(/\s+/g, " ")
             .trim();
-          span.setAttribute("data-sentenceid", `${articleNum}-${dtNum}`);
+          span.innerText = text;
+          const sentenceID = `${articleNum}-${Object.keys(
+            articleJSON[articleNum]
+          ).length.toString()}`;
+          span.setAttribute("data-sentenceid", sentenceID);
           dd.appendChild(span);
 
           const div = document.createElement("div");
@@ -267,14 +286,19 @@ const getEPLaw = async () => {
           if (dtNum === "(a)") {
             const childDl = document.createElement("dl");
             childDl.appendChild(div);
-            if (prev.querySelector("dd:last-child")) {
-              prev.querySelector("dd:last-child")!.appendChild(childDl);
+
+            const dds = prev.querySelectorAll("dd");
+            if (dds.length > 0) {
+              dds[dds.length - 1].appendChild(childDl);
             } else {
               prev.appendChild(childDl);
             }
+
+            articleJSON[articleNum][sentenceID] = text;
           } else if (/\([b-z]\)/.test(dtNum)) {
-            const childDl = prev.querySelector("dl")!;
-            childDl.appendChild(div);
+            const dls = prev.querySelectorAll("dl");
+            dls[dls.length - 1].appendChild(div);
+            articleJSON[articleNum][sentenceID] = text;
           } else if (dtNum === "-") {
             if (!prev.querySelector("ul")) {
               const ul = document.createElement("ul");
@@ -282,10 +306,14 @@ const getEPLaw = async () => {
             }
             const li = document.createElement("li");
             li.innerText = ddContent;
-            li.setAttribute("data-sentenceid", `${articleNum}-${dtNum}`);
+            li.setAttribute("data-sentenceid", sentenceID);
             prev.querySelector("ul")?.appendChild(li);
+
+            articleJSON[articleNum][sentenceID] = text;
           } else {
             prev.appendChild(div);
+
+            articleJSON[articleNum][sentenceID] = text;
           }
 
           return prev;
@@ -295,6 +323,7 @@ const getEPLaw = async () => {
       return { articleNum, articleCaption, content };
     }
   );
+  console.log({ articleJSON });
   const enObj = enArr.reduce(
     (
       prev: {
