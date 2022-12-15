@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext } from "react";
 import Annotator from "./Annotator";
 import { kanji2number } from "@geolonia/japanese-numeral";
+import { Prev } from "react-bootstrap/esm/PageItem";
 
 // @ts-ignore
 export const LawContext = createContext<Law>({});
@@ -13,6 +14,7 @@ const lawInfo: {
       chikujo?: string;
       ja?: string;
       en?: string;
+      TOCen?: string;
     };
   };
 } = {
@@ -35,6 +37,7 @@ const lawInfo: {
     path: {
       ja: "./resource/EP/epc_ja.html",
       en: "./resource/EP/epc_html/whole.html",
+      TOCen: "./resource/EP/epc_html/TOCen.csv",
     },
   },
 };
@@ -345,7 +348,42 @@ const getEPLaw = async () => {
     {}
   );
 
-  return { en: { articleObj: enObj, articleArr: enArr }, ja: ja };
+  // TODO!!! TOCを追加する
+  const TOCen_result = await fetch(lawInfo["epc"].path.TOCen!);
+  const TOC: {
+    [articleNum: string]: {
+      part?: string;
+      chapter?: string;
+    };
+  } = (await TOCen_result.text())
+    .split("\n")
+    .map((line: string) => line.split(","))
+    .reduce(
+      (
+        prev: {
+          [articleNum: string]: {
+            part?: string;
+            chapter?: string;
+          };
+        },
+        cur
+      ) => {
+        if (!prev[cur[1]]) {
+          prev[cur[1]] = {};
+        }
+        if (/^PART/.test(cur[0])) {
+          // part
+          prev[cur[1]]["part"] = cur[0];
+        } else {
+          // chapter
+          prev[cur[1]]["chapter"] = cur[0];
+        }
+        return prev;
+      },
+      {}
+    );
+
+  return { en: { articleObj: enObj, articleArr: enArr, TOC: TOC }, ja: ja };
 };
 
 // 以下、対訳HTMLのパース用関数

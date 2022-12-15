@@ -109,6 +109,12 @@ declare global {
         articleCaption: string;
         content: string;
       }[];
+      TOC: {
+        [articleNum: string]: {
+          part?: string;
+          chapter?: string;
+        };
+      };
     };
     ja: {
       [articleNum: string]: { title: string; content: string };

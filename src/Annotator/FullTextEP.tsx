@@ -21,8 +21,33 @@ const FullTextEP = (props: FullTextEPProps) => {
             article.articleNum,
             props.targetedArticleNum
           );
+
+          let TOCPart = <></>;
+          if ((law.content["epc"] as EPLawXML).en.TOC[article.articleNum]) {
+            TOCPart = (
+              <h5>
+                {
+                  (law.content["epc"] as EPLawXML).en.TOC[article.articleNum]
+                    .part
+                }
+              </h5>
+            );
+          }
+          let TOCChapter = <></>;
+          if ((law.content["epc"] as EPLawXML).en.TOC[article.articleNum]) {
+            TOCChapter = (
+              <h6 style={{ fontWeight: "bold", paddingTop: "10px" }}>
+                {
+                  (law.content["epc"] as EPLawXML).en.TOC[article.articleNum]
+                    .chapter
+                }
+              </h6>
+            );
+          }
           return (
             <React.Fragment key={i}>
+              {TOCPart}
+              {TOCChapter}
               <ArticleEP
                 selectedLaw={props.selectedLaw}
                 article={article}
@@ -274,4 +299,3 @@ export const getJSXElement = (
   console.log("error?", node);
   return <></>;
 };
-
